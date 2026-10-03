@@ -1,0 +1,25 @@
+# Secrets -- never commit real keys
+.env
+*.pem
+*.key
+
+# Data store -- generated locally/on the server, not source
+data_store/
+*.parquet
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Logs
+*.log
+logs/
+
+# OS/editor noise
+.DS_Store
+.vscode/
+.idea/
