@@ -31,6 +31,7 @@ def _signal_from_model(
     model_name: str,
     apply_cost_filter: bool,
     apply_sizing: bool,
+    taker: bool = True,
 ) -> pd.Series:
     target = get_target(price)
     fwd_ret = future_return(price)
@@ -58,7 +59,7 @@ def _signal_from_model(
             if np.isnan(avg_win) or np.isnan(avg_loss):
                 continue  # no hits in this train window -- no basis to trade
             expected = costs.proba_to_expected_return(proba, avg_win, avg_loss)
-            proba = proba[costs.passes_cost_filter(expected)]
+            proba = proba[costs.passes_cost_filter(expected, taker)]
 
         if apply_sizing:
             vol = features["realized_vol"].reindex(proba.index).fillna(0.0) \
@@ -75,16 +76,19 @@ def _signal_from_model(
     return position.rolling(config.TARGET_HORIZON, min_periods=1).max()
 
 
-def run_ablation(price: pd.Series, features: pd.DataFrame) -> pd.DataFrame:
+def run_ablation(price: pd.Series, features: pd.DataFrame, taker: bool = True) -> pd.DataFrame:
     """
     price: single-asset price series.
     features: full feature matrix (all groups already built) for that asset.
+    taker: charge taker fees (market orders) vs maker fees (resting limits).
+    Maker assumes every order fills at the bar price -- optimistic, so treat
+    maker results as an upper bound, not a forecast.
     Returns a comparison table across the 8 baselines.
     """
     rows = []
 
     def _eval(name: str, position: pd.Series):
-        sim = simulate(price, position)
+        sim = simulate(price, position, taker=taker)
         stats = summarize(sim)
         stats["baseline"] = name
         rows.append(stats)
@@ -125,6 +129,6 @@ def run_ablation(price: pd.Series, features: pd.DataFrame) -> pd.DataFrame:
 
     # 8. full transaction-cost-aware strategy
     _eval("8_full_cost_aware", _signal_from_model(features, price, "random_forest",
-                                                    apply_cost_filter=True, apply_sizing=True))
+                                                    apply_cost_filter=True, apply_sizing=True, taker=taker))
 
     return pd.DataFrame(rows).set_index("baseline")
