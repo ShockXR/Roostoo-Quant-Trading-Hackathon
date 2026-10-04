@@ -111,6 +111,11 @@ def main():
           f"{features.index[0]} -> {features.index[-1]}, {features.shape[1]} features, "
           f"horizon={config.TARGET_HORIZON} bars, fees={'maker' if args.maker else 'taker'}")
 
+    min_bars = config.WALKFORWARD_TRAIN_BARS + config.WALKFORWARD_VAL_BARS
+    if len(features) < min_bars:
+        print(f"WARNING: {len(features)} bars < {min_bars} needed for one walk-forward fold -- "
+              "ML baselines (6-8) will never trade; use a smaller --bar or a longer window")
+
     results = run_ablation(price, features, taker=not args.maker)
 
     out_path = args.out or RESULTS_DIR / f"{args.symbol}_{args.bar}_h{config.TARGET_HORIZON}_ablation.csv"
