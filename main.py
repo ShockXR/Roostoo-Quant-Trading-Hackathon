@@ -12,7 +12,7 @@ from . import config, costs, sizing
 from .data.collector import poll_once
 from .data.store import load_all
 from .execution.trader import place_order
-from .features.build_features import build_features_for_pair, build_price_panel
+from .features.build_features import build_features_for_pair, build_price_panel, model_inputs
 
 log = logging.getLogger("main")
 logging.basicConfig(level=logging.INFO)
@@ -20,7 +20,10 @@ logging.basicConfig(level=logging.INFO)
 DRY_RUN = True  # flip only after burn-in paper-trading period looks correct
 
 
-def run_once(model=None):
+def run_once(model=None, calibration: tuple[float, float] | None = None):
+    """calibration: (avg_win, avg_loss) -- mean forward return of target
+    hits / -mean forward return of misses over the model's training window,
+    exactly as backtest/ablation.py computes them per fold."""
     poll_once()
     raw = load_all(config.UNIVERSE)
     panel = build_price_panel(raw)
@@ -32,16 +35,21 @@ def run_once(model=None):
             continue
 
         features = build_features_for_pair(pair, raw, panel)
-        latest = features.iloc[[-1]].dropna(axis=1)
-        if latest.empty or model is None:
+        # same columns the model was trained on; a NaN anywhere means the
+        # feature row isn't warm yet (dropping columns would break the model)
+        latest = model_inputs(features).iloc[[-1]]
+        if model is None or latest.isna().any(axis=None):
             continue
 
         proba = model.predict_proba(latest)[:, 1][0]
         realized_vol = features["realized_vol"].iloc[-1] if "realized_vol" in features.columns else 0.0
 
-        gross_edge_estimate = proba - 0.5
-        if not costs.passes_cost_filter(gross_edge_estimate):
-            log.info("%s: signal (p=%.3f) does not clear cost filter, skipping", pair, proba)
+        if calibration is None:
+            log.warning("%s: no (avg_win, avg_loss) calibration -- cannot cost-filter, skipping", pair)
+            continue
+        expected = costs.proba_to_expected_return(proba, *calibration)
+        if not costs.passes_cost_filter(expected):
+            log.info("%s: signal (p=%.3f, E[r]=%.5f) does not clear cost filter, skipping", pair, proba, expected)
             continue
 
         size = sizing.confidence_to_size(proba, realized_vol)
@@ -56,10 +64,10 @@ def run_once(model=None):
             # -- convert to actual quantity using current balance & price before going live.
 
 
-def run_forever(interval: int = config.POLL_INTERVAL_SECONDS, model=None):
+def run_forever(interval: int = config.POLL_INTERVAL_SECONDS, model=None, calibration=None):
     while True:
         try:
-            run_once(model=model)
+            run_once(model=model, calibration=calibration)
         except Exception:
             log.exception("error in main loop")
         time.sleep(interval)

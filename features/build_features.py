@@ -55,6 +55,20 @@ def build_features_for_pair(
     return df
 
 
+# Price-level columns kept on the feature frame for downstream use (the
+# backtest needs last_price) but never fed to a model: they're
+# non-stationary, so a model trained on one price range doesn't transfer
+# to the next fold. Their information is already in the ratio features
+# (ma_ratio, dist_from_ma_*).
+NON_MODEL_COLUMNS = ["last_price", "ma_fast", "ma_slow"]
+
+
+def model_inputs(feature_df: pd.DataFrame) -> pd.DataFrame:
+    """The columns a model may train/predict on -- use this in both the
+    backtest and the live loop so they always see the same inputs."""
+    return feature_df.drop(columns=[c for c in NON_MODEL_COLUMNS if c in feature_df.columns])
+
+
 def assert_no_lookahead(feature_df: pd.DataFrame, target_df: pd.DataFrame):
     """
     Sanity check: every feature row's timestamp must be <= the timestamp

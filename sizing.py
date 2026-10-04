@@ -28,9 +28,8 @@ def confidence_to_size(
 
     # volatility-aware shrink: normalize against a reference vol level.
     # if realized_vol is missing/zero, don't scale (avoid div-by-zero blowups).
-    reference_vol = 0.01  # tune from historical realized_vol distribution
     if realized_vol and realized_vol > 0:
-        vol_scale = min(1.0, reference_vol / realized_vol)
+        vol_scale = min(1.0, config.SIZING_REFERENCE_VOL / realized_vol)
         raw_size *= vol_scale
 
     return max(0.0, min(raw_size, max_position))

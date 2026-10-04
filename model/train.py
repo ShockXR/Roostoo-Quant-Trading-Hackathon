@@ -7,11 +7,15 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 
 from .. import config
 
 MODEL_REGISTRY = {
-    "logistic": lambda: LogisticRegression(max_iter=1000),
+    # features live on very different scales (returns ~1e-3, RSI ~50, ranks
+    # 1..N) -- unscaled, lbfgs never converges and the fit is meaningless
+    "logistic": lambda: make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000)),
     "random_forest": lambda: RandomForestClassifier(
         n_estimators=200, max_depth=5, random_state=config.RANDOM_SEED
     ),
@@ -24,12 +28,15 @@ def walk_forward_splits(
     train_bars: int = config.WALKFORWARD_TRAIN_BARS,
     val_bars: int = config.WALKFORWARD_VAL_BARS,
     step_bars: int = config.WALKFORWARD_STEP_BARS,
+    purge_bars: int = config.TARGET_HORIZON,
 ):
     """Yields (train_idx, val_idx) index arrays, strictly chronological,
-    each val block immediately following its train block, rolled forward."""
+    rolled forward. The last `purge_bars` rows before each val block are
+    dropped from training: their targets look `TARGET_HORIZON` bars ahead,
+    i.e. into the val block, so keeping them leaks val prices into training."""
     start = 0
     while start + train_bars + val_bars <= n_rows:
-        train_idx = np.arange(start, start + train_bars)
+        train_idx = np.arange(start, start + train_bars - purge_bars)
         val_idx = np.arange(start + train_bars, start + train_bars + val_bars)
         yield train_idx, val_idx
         start += step_bars
@@ -68,6 +75,7 @@ def train_walk_forward(
             "train_score": train_score,
             "val_score": val_score,
             "train_val_gap": train_score - val_score,   # overfitting signal
+            "train_index": X.index[train_idx],
             "val_index": X.index[val_idx],
             "val_proba": val_proba,
             "val_true": yv[val_idx],

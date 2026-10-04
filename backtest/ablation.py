@@ -3,10 +3,12 @@ Runs the sequential baseline comparison (buy/hold -> full cost-aware model)
 described in the strategy doc, and reports whether each added component
 actually earns its place out-of-sample and after costs.
 """
+import numpy as np
 import pandas as pd
 
-from .. import config, sizing
-from ..model.targets import get_target
+from .. import config, costs, sizing
+from ..features.build_features import model_inputs
+from ..model.targets import future_return, get_target
 from ..model.train import train_walk_forward
 from .engine import simulate, summarize
 
@@ -31,7 +33,8 @@ def _signal_from_model(
     apply_sizing: bool,
 ) -> pd.Series:
     target = get_target(price)
-    aligned = features.join(target.rename("y")).dropna()
+    fwd_ret = future_return(price)
+    aligned = model_inputs(features).join(target.rename("y")).dropna()
     if aligned.empty:
         return pd.Series(0.0, index=price.index)
 
@@ -41,21 +44,35 @@ def _signal_from_model(
 
     position = pd.Series(0.0, index=price.index)
     for fold in folds:
-        proba = fold["val_proba"]
-        idx = fold["val_index"]
-        for i, p in zip(idx, proba):
-            gross_edge_estimate = p - 0.5  # crude proxy without avg_win/avg_loss calibration
-            if apply_cost_filter:
-                from .. import costs
-                if not costs.passes_cost_filter(gross_edge_estimate):
-                    continue
-            if apply_sizing:
-                vol = features["realized_vol"].get(i, 0.0) if "realized_vol" in features.columns else 0.0
-                size = sizing.confidence_to_size(p, vol)
-            else:
-                size = config.MAX_POSITION_PER_ASSET if p >= 0.5 else 0.0
-            position.loc[i] = size
-    return position
+        proba = pd.Series(fold["val_proba"], index=fold["val_index"])
+
+        if apply_cost_filter:
+            # Turn P(target hit) into an expected return using the average
+            # realized forward return of hits / misses in this fold's TRAIN
+            # window only (no val data). The old `p - 0.5` proxy compared a
+            # probability with a return, so it passed almost every p > 0.503.
+            train_y = y.loc[fold["train_index"]]
+            train_fwd = fwd_ret.loc[fold["train_index"]]
+            avg_win = train_fwd[train_y == 1].mean()
+            avg_loss = -train_fwd[train_y == 0].mean()
+            if np.isnan(avg_win) or np.isnan(avg_loss):
+                continue  # no hits in this train window -- no basis to trade
+            expected = costs.proba_to_expected_return(proba, avg_win, avg_loss)
+            proba = proba[costs.passes_cost_filter(expected)]
+
+        if apply_sizing:
+            vol = features["realized_vol"].reindex(proba.index).fillna(0.0) \
+                if "realized_vol" in features.columns else pd.Series(0.0, index=proba.index)
+            size = [sizing.confidence_to_size(p, v) for p, v in zip(proba, vol)]
+        else:
+            size = (proba >= 0.5) * config.MAX_POSITION_PER_ASSET
+        position.loc[proba.index] = size
+
+    # The model predicts the return over the next TARGET_HORIZON bars, so
+    # hold each entry that long instead of exiting the moment the signal
+    # fades -- otherwise we pay a full round trip to capture one bar of a
+    # 10-bar forecast. A fresh signal inside the window extends the hold.
+    return position.rolling(config.TARGET_HORIZON, min_periods=1).max()
 
 
 def run_ablation(price: pd.Series, features: pd.DataFrame) -> pd.DataFrame:

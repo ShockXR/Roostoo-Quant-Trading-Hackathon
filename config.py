@@ -119,6 +119,11 @@ MAX_PORTFOLIO_EXPOSURE = 0.7      # fraction of capital deployed at once
 MAX_TRADES_PER_HOUR = 20
 MAX_DRAWDOWN_KILL_SWITCH = 0.12   # Calmar = return / max drawdown, so capping drawdown directly protects this metric
 MIN_CONFIDENCE_TO_TRADE = 0.55     # model probability threshold to act at all
+# Per-bar realized vol (REGIME_VOL_WINDOW-bar std of 1m returns) above which
+# position size is shrunk proportionally. ~median for SOL 1m, Jul-Sep 2026
+# (median 0.00057, p75 0.00079); the old 0.01 was never reached on 1m bars,
+# so the vol shrink was a no-op. Re-tune if POLL_INTERVAL_SECONDS changes.
+SIZING_REFERENCE_VOL = 0.0006
 
 # --- Component switches (used by the ablation harness) ---
 COMPONENTS = {

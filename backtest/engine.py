@@ -34,6 +34,7 @@ def simulate(
     drawdown = equity / running_max - 1.0
 
     out = pd.DataFrame({
+        "position": df["position"],
         "gross_return": gross_ret,
         "net_return": net_ret,
         "equity": equity,
@@ -61,6 +62,11 @@ def _calmar_ratio(total_return: float, max_drawdown: float, years: float) -> flo
         return 0.0
     annualized_return = (1 + total_return) ** (1 / years) - 1
     return annualized_return / abs(max_drawdown)
+
+
+def _in_position_win_rate(sim_result: pd.DataFrame) -> float:
+    held = sim_result.loc[sim_result["position"].abs() > 1e-12, "net_return"].dropna()
+    return (held > 0).mean() if len(held) else float("nan")
 
 
 def summarize(
@@ -94,5 +100,7 @@ def summarize(
         "max_drawdown": max_dd,
         "avg_turnover": sim_result["turnover"].mean(),
         "n_trades_proxy": (sim_result["turnover"] > 1e-9).sum(),
-        "win_rate": (net > 0).mean() if len(net) else float("nan"),
+        # only bars actually holding a position -- flat bars return exactly 0
+        # and would otherwise drag win rate toward 0 for any selective strategy
+        "win_rate": _in_position_win_rate(sim_result),
     }
