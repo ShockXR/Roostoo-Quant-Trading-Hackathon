@@ -57,6 +57,12 @@ def train_walk_forward(
     yv = y.values
 
     for fold, (train_idx, val_idx) in enumerate(walk_forward_splits(len(X), **split_kwargs)):
+        # In quiet stretches the threshold target can go a whole train window
+        # without a single hit. Nothing to learn from -> no predictions for
+        # this val block (callers treat a missing fold as "stay flat").
+        if np.unique(yv[train_idx]).size < 2:
+            continue
+
         model = MODEL_REGISTRY[model_name]()
         model.fit(Xv[train_idx], yv[train_idx])
 
