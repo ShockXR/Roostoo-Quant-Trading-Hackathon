@@ -13,12 +13,12 @@ try:
     import config, costs, sizing, strategy
     from data.collector import poll_once
     from data.store import load_all
-    from execution.trader import place_order, log_trade_to_csv
+    from execution.trader import place_order
 except ImportError:
     from . import config, costs, sizing, strategy
     from .data.collector import poll_once
     from .data.store import load_all
-    from .execution.trader import place_order, log_trade_to_csv
+    from .execution.trader import place_order
 
 log = logging.getLogger("main")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -78,7 +78,6 @@ def run_once():
             place_order(pair, "BUY", quantity=latest_signal)
         else:
             log.info("📝 [PAPER TRADE / DRY RUN] Simulated BUY order for %s with size=%.4f", pair, latest_signal)
-            log_trade_to_csv(pair, "BUY", quantity=latest_signal, execution_type="PAPER_TRADE")
 
 
 def run_forever(interval: int = config.POLL_INTERVAL_SECONDS):

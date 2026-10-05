@@ -68,6 +68,32 @@ def get_pending_count():
     return _request("GET", "/v3/pending_count", {}, params=True)
 
 
+import csv
+import os
+from datetime import datetime
+
+TRADES_CSV_PATH = os.path.join(config.STORE_DIR, "trades_log.csv")
+
+
+def log_trade_to_csv(pair: str, side: str, quantity: float, execution_type: str = "LIVE", price: float | None = None, order_id: str | None = None):
+    """Appends trade records (Live or Paper) to data_store/trades_log.csv automatically."""
+    os.makedirs(config.STORE_DIR, exist_ok=True)
+    file_exists = os.path.isfile(TRADES_CSV_PATH)
+    with open(TRADES_CSV_PATH, mode="a", newline="") as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(["timestamp", "pair", "side", "quantity", "price", "execution_type", "order_id"])
+        writer.writerow([
+            datetime.utcnow().isoformat(),
+            pair,
+            side.upper(),
+            quantity,
+            price if price is not None else "MARKET",
+            execution_type,
+            order_id if order_id is not None else ""
+        ])
+
+
 def place_order(pair: str, side: str, quantity: float, price: float | None = None):
     payload = {
         "pair": pair,
@@ -77,7 +103,10 @@ def place_order(pair: str, side: str, quantity: float, price: float | None = Non
     }
     if price is not None:
         payload["price"] = str(price)
-    return _request("POST", "/v3/place_order", payload, params=False)
+    resp = _request("POST", "/v3/place_order", payload, params=False)
+    order_id = resp.get("order_id") if isinstance(resp, dict) else None
+    log_trade_to_csv(pair, side, quantity, execution_type="LIVE", price=price, order_id=order_id)
+    return resp
 
 
 def cancel_order(order_id: int | None = None, pair: str | None = None):
