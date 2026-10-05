@@ -62,10 +62,8 @@ UNIVERSE_GROUPS = {
     ],
 }
 
-# Active trading universe -- start with majors only (best data, best
-# liquidity, cleanest cross-sectional signal). Expand later by adding
-# another group's list, e.g. UNIVERSE = UNIVERSE_GROUPS["majors"] + UNIVERSE_GROUPS["defi_midcap"]
-UNIVERSE = UNIVERSE_GROUPS["majors"]
+# Active trading universe -- set to your 6 chosen major coins
+UNIVERSE = ["BTC/USD", "ETH/USD", "SOL/USD", "BNB/USD", "XRP/USD", "ADA/USD"]
 MARKET_PROXY = "BTC/USD"  # used for "return relative to market" features
 
 # --- Data collection ---

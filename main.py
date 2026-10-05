@@ -48,7 +48,10 @@ def run_once():
         log.warning("No market data available yet.")
         return
 
-    for pair in config.UNIVERSE:
+    # Focus processing strictly on Whitelisted LIVE_PAIRS (or all if 'ALL' is specified)
+    active_pairs = LIVE_PAIRS if "ALL" not in LIVE_PAIRS else config.UNIVERSE
+
+    for pair in active_pairs:
         if pair not in raw or raw[pair].empty:
             continue
 
