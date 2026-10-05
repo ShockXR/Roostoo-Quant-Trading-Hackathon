@@ -5,7 +5,10 @@ import hashlib
 import hmac
 import time
 
-from .. import config
+try:
+    from .. import config
+except ImportError:
+    import config
 
 
 def get_timestamp() -> str:

@@ -1,79 +1,83 @@
 """
-Live loop: fetch -> feature -> predict -> cost filter -> size -> execute.
-
-Run in DRY_RUN mode first (paper-trade): logs intended trades without
-calling place_order, so you can compare live decisions against what the
-backtest predicts for the same incoming data before risking anything.
+Live trading loop: polling -> compute quantitative strategy signal -> size -> execute.
+Runs pure rule-based strategies (e.g. Mean-Reversion / Reversal) without any ML models.
 """
 import logging
+import os
+import sys
 import time
 
-from . import config, costs, sizing
-from .data.collector import poll_once
-from .data.store import load_all
-from .execution.trader import place_order
-from .features.build_features import build_features_for_pair, build_price_panel, model_inputs
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+try:
+    import config
+    import costs
+    import sizing
+    import strategy
+    from data.collector import poll_once
+    from data.store import load_all
+    from execution.trader import place_order
+except ImportError:
+    from . import config, costs, sizing, strategy
+    from .data.collector import poll_once
+    from .data.store import load_all
+    from .execution.trader import place_order
 
 log = logging.getLogger("main")
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 
-DRY_RUN = True  # flip only after burn-in paper-trading period looks correct
+DRY_RUN = True  # Set to False when ready to place live orders on Roostoo
+SELECTED_STRATEGY = "reversal"  # Options: 'reversal', 'buy_hold', etc.
 
 
-def run_once(model=None, calibration: tuple[float, float] | None = None):
-    """calibration: (avg_win, avg_loss) -- mean forward return of target
-    hits / -mean forward return of misses over the model's training window,
-    exactly as backtest/ablation.py computes them per fold."""
+def run_once():
+    """Single execution step: fetch latest prices, compute strategy signals, execute trades."""
     poll_once()
     raw = load_all(config.UNIVERSE)
-    panel = build_price_panel(raw)
+
+    if not raw:
+        log.warning("No market data available yet.")
+        return
 
     for pair in config.UNIVERSE:
+        if pair not in raw or raw[pair].empty:
+            continue
+
         df = raw[pair]
-        if len(df) < max(config.MOMENTUM_HORIZONS + [config.MEAN_REV_WINDOW, config.REGIME_VOL_WINDOW]):
-            log.info("%s: not enough history yet, skipping", pair)
+        min_bars_needed = max(config.REVERSAL_LOOKBACK_BARS, config.REVERSAL_HOLD_BARS)
+        if len(df) < min_bars_needed:
+            log.info("%s: accumulating price history (%d/%d bars)", pair, len(df), min_bars_needed)
             continue
 
-        features = build_features_for_pair(pair, raw, panel)
-        # same columns the model was trained on; a NaN anywhere means the
-        # feature row isn't warm yet (dropping columns would break the model)
-        latest = model_inputs(features).iloc[[-1]]
-        if model is None or latest.isna().any(axis=None):
+        # Evaluate selected quantitative strategy
+        strat_fn = strategy.STRATEGIES.get(SELECTED_STRATEGY, strategy._reversal)
+        signals = strat_fn(pair, raw, None, df, {})
+
+        if signals is None or signals.empty:
             continue
 
-        proba = model.predict_proba(latest)[:, 1][0]
-        realized_vol = features["realized_vol"].iloc[-1] if "realized_vol" in features.columns else 0.0
-
-        if calibration is None:
-            log.warning("%s: no (avg_win, avg_loss) calibration -- cannot cost-filter, skipping", pair)
-            continue
-        expected = costs.proba_to_expected_return(proba, *calibration)
-        if not costs.passes_cost_filter(expected):
-            log.info("%s: signal (p=%.3f, E[r]=%.5f) does not clear cost filter, skipping", pair, proba, expected)
+        latest_signal = signals.iloc[-1]
+        if latest_signal <= 0:
+            log.info("%s: strategy %s signal=%.4f (no action)", pair, SELECTED_STRATEGY, latest_signal)
             continue
 
-        size = sizing.confidence_to_size(proba, realized_vol)
-        if size <= 0:
-            continue
-
-        side = "BUY" if proba >= 0.5 else "SELL"
-        log.info("%s: %s size=%.4f proba=%.3f", pair, side, size, proba)
+        log.info("%s: STRATEGY SIGNAL TRIGGERED (%s) target_weight=%.4f", pair, SELECTED_STRATEGY, latest_signal)
 
         if not DRY_RUN:
-            place_order(pair, side, quantity=size)  # NOTE: size here is a capital fraction
-            # -- convert to actual quantity using current balance & price before going live.
+            place_order(pair, "BUY", quantity=latest_signal)
+        else:
+            log.info("[DRY RUN] Would place BUY order for %s with size=%.4f", pair, latest_signal)
 
 
-def run_forever(interval: int = config.POLL_INTERVAL_SECONDS, model=None, calibration=None):
+def run_forever(interval: int = config.POLL_INTERVAL_SECONDS):
+    log.info("Starting live strategy loop (Strategy: %s, DRY_RUN=%s)", SELECTED_STRATEGY, DRY_RUN)
     while True:
         try:
-            run_once(model=model, calibration=calibration)
+            run_once()
         except Exception:
-            log.exception("error in main loop")
+            log.exception("Error in main strategy loop")
         time.sleep(interval)
 
 
 if __name__ == "__main__":
-    log.info("Starting in DRY_RUN=%s. Train a model first via model/train.py "
-              "and pass it into run_forever(model=...) before enabling live trades.", DRY_RUN)
     run_forever()

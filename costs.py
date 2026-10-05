@@ -5,7 +5,10 @@ prediction, not baked into the target threshold alone (the threshold
 target already biases the model to avoid marginal trades, but this
 filter is the final, explicit check using current settings).
 """
-from . import config
+try:
+    from . import config
+except ImportError:
+    import config
 
 
 def estimate_round_trip_cost(taker: bool = True) -> float:

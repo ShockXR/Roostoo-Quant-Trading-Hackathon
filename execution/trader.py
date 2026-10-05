@@ -8,8 +8,12 @@ import time
 
 import requests
 
-from .. import config
-from .auth import sign
+try:
+    from .. import config
+    from .auth import sign
+except ImportError:
+    import config
+    from execution.auth import sign
 
 log = logging.getLogger("trader")
 

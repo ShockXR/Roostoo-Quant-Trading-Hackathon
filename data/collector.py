@@ -6,9 +6,14 @@ price history before you have anything else to backtest against.
 import logging
 import time
 
-from .. import config
-from ..execution.trader import get_ticker
-from .store import append_tick
+try:
+    from .. import config
+    from ..execution.trader import get_ticker
+    from .store import append_tick
+except ImportError:
+    import config
+    from execution.trader import get_ticker
+    from data.store import append_tick
 
 log = logging.getLogger("collector")
 logging.basicConfig(level=logging.INFO)

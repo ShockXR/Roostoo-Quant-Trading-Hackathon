@@ -6,7 +6,10 @@ import os
 
 import pandas as pd
 
-from .. import config
+try:
+    from .. import config
+except ImportError:
+    import config
 
 os.makedirs(config.STORE_DIR, exist_ok=True)
 

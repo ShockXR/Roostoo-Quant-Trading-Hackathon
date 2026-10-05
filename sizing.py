@@ -5,7 +5,10 @@ risk limits. This layer matters more to overall PnL than small gains in
 model accuracy -- a mediocre model with disciplined sizing beats a great
 model with none.
 """
-from . import config
+try:
+    from . import config
+except ImportError:
+    import config
 
 
 def confidence_to_size(

@@ -5,7 +5,10 @@ Answers: "is this asset moving persistently relative to its OWN history?"
 """
 import pandas as pd
 
-from .. import config
+try:
+    from .. import config
+except ImportError:
+    import config
 
 
 def add_momentum_features(df: pd.DataFrame, price_col: str = "last_price") -> pd.DataFrame:

@@ -9,7 +9,10 @@ simple features don't already move the needle in the ablation study.
 import numpy as np
 import pandas as pd
 
-from .. import config
+try:
+    from .. import config
+except ImportError:
+    import config
 
 
 def add_regime_features(df: pd.DataFrame, price_col: str = "last_price") -> pd.DataFrame:

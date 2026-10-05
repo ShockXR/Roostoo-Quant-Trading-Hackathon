@@ -10,7 +10,10 @@ they were actually the start of a genuine breakdown.
 import numpy as np
 import pandas as pd
 
-from .. import config
+try:
+    from .. import config
+except ImportError:
+    import config
 
 
 def _rsi(prices: pd.Series, window: int) -> pd.Series:

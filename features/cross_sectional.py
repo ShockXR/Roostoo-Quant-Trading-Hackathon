@@ -8,7 +8,10 @@ Requires price histories for the whole universe aligned on timestamp.
 """
 import pandas as pd
 
-from .. import config
+try:
+    from .. import config
+except ImportError:
+    import config
 
 
 def build_cross_sectional_features(

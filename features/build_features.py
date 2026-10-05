@@ -5,11 +5,18 @@ run the same pipeline with pieces disabled.
 """
 import pandas as pd
 
-from .. import config
-from .cross_sectional import build_cross_sectional_features
-from .mean_reversion import add_mean_reversion_features
-from .momentum import add_momentum_features
-from .regime import add_regime_features, attach_market_wide_features
+try:
+    from .. import config
+    from .cross_sectional import build_cross_sectional_features
+    from .mean_reversion import add_mean_reversion_features
+    from .momentum import add_momentum_features
+    from .regime import add_regime_features, attach_market_wide_features
+except ImportError:
+    import config
+    from features.cross_sectional import build_cross_sectional_features
+    from features.mean_reversion import add_mean_reversion_features
+    from features.momentum import add_momentum_features
+    from features.regime import add_regime_features, attach_market_wide_features
 
 
 def build_price_panel(raw: dict[str, pd.DataFrame]) -> pd.DataFrame:
