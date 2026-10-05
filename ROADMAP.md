@@ -137,6 +137,10 @@ Still to do: the live spread and volume check over several days needs a long-run
 
 Phase 3 chose a two-lookback momentum blend ([docs/MIDCAP_RESEARCH.md](docs/MIDCAP_RESEARCH.md)); the team set a 1.5% daily volatility target. Phase 4 wired it into the bot as `--strategy midcap` with the staged de-risk above. What remains before live trading is in [docs/LIVE_READINESS.md](docs/LIVE_READINESS.md).
 
+## Phase 5 status (as of 2026-10-05)
+
+Replay and fake-exchange checks are done and described in [docs/LIVE_READINESS.md](docs/LIVE_READINESS.md), along with the checklist for the paper run on EC2. The paper run itself and the switch to live are the remaining steps. Findings: the live engine reproduces the backtest closely without the drawdown schedule; with it, individual 14-day windows can differ by up to 3 points in either direction, with no average bias; the schedule costs about a third of the average return for about two points less worst drawdown.
+
 ## Gates
 
 Suggested starting thresholds, adjust as evidence comes in.
