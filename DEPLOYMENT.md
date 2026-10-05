@@ -1,122 +1,87 @@
-# Deployment Guide: GitHub + AWS (24/7)
+# Deployment: AWS EC2 (competition setup)
 
-## Part 1 — Push to GitHub
+The bot runs on an EC2 instance in Sydney (`ap-southeast-2`) launched from the organizers' `Hackathon-Starter-Template`, connected through Session Manager (SSH is blocked). AWS only hosts the bot; all trading happens inside the bot's own loop, and every strategy change goes through a commit, `git pull` and a restart. Never call the trading API by hand: manual intervention is prohibited by the competition rules.
 
-The repo is already initialized locally with a clean commit history. You just
-need to create the remote and push.
+Current status of the code and what remains before going live: [docs/LIVE_READINESS.md](docs/LIVE_READINESS.md).
 
-1. Create a new **empty** repo on GitHub (no README/license/gitignore —
-   we already have those) — e.g. `roostoo-trading-bot`.
-2. Set your own git identity (replace the placeholder used during setup):
-   ```bash
-   git config user.name "Your Name"
-   git config user.email "you@example.com"
-   ```
-3. Add the remote and push:
-   ```bash
-   git remote add origin https://github.com/<your-username>/roostoo-trading-bot.git
-   git branch -M main
-   git push -u origin main
-   ```
-4. **Double-check no secrets leaked**: `.env` is gitignored, and `config.py`
-   only reads from environment variables — confirm `git log -p -- config.py`
-   shows no real key/secret strings before making the repo public.
+## 1. Launch and connect
 
-From now on, every strategy change should be its own commit (not one giant
-commit at the end) — this directly satisfies the competition's "commit
-history transparency" rule, which exists to prove the bot runs autonomously
-rather than being hand-operated.
+Follow the organizers' guide: sign in through the AWS access portal, check the region is `ap-southeast-2`, launch an instance from `Hackathon-Starter-Template` (no key pair), wait for status checks, then Connect > Session Manager.
 
-## Part 2 — Launch an AWS EC2 instance
-
-1. **Instance type**: a `t3.micro` or `t3.small` is plenty — this bot polls
-   once a minute and trains lightweight models, it's not compute-heavy.
-2. **AMI**: Ubuntu 22.04 LTS.
-3. **Security group**: no inbound ports need to be open for this bot (it only
-   makes outbound calls to Roostoo). Leave inbound restricted to SSH (22)
-   from your IP only.
-4. **Storage**: default 8–20 GB is enough; the parquet tick history for a
-   20-asset universe over 14 days is small.
-5. Launch it, and SSH in:
-   ```bash
-   ssh -i your-key.pem ubuntu@<instance-public-ip>
-   ```
-
-## Part 3 — Server setup
+## 2. Install
 
 ```bash
-sudo apt update && sudo apt install -y python3-venv python3-pip git
-
-git clone https://github.com/<your-username>/roostoo-trading-bot.git roostoo_bot_repo
+cd ~
+git clone https://github.com/ShockXR/Roostoo-Quant-Trading-Hackathon roostoo_bot_repo   # open-source repo, no login needed
 cd roostoo_bot_repo
+git checkout main && git pull
+python3 --version        # needs 3.10 or newer
+```
 
-python3 -m venv .venv
+If Python is older than 3.10 (Amazon Linux 2023 ships 3.9), install a newer one and use it below in place of `python3`:
+
+```bash
+sudo dnf install -y python3.11 python3.11-pip
+```
+
+```bash
+python3 -m venv .venv      # or python3.11 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt  # includes editable package installation
-python -m unittest discover -s tests -t . -v
-
+pip install -r requirements.txt
 mkdir -p logs data_store
-
-# Create the real .env file (never commit this)
 cp .env.example .env
-nano .env   # fill in ROOSTOO_API_KEY and ROOSTOO_API_SECRET
+nano .env                  # ROOSTOO_API_KEY / ROOSTOO_API_SECRET; never commit this file
 ```
 
-## Part 4 — Run it as a systemd service (24/7, auto-restart)
+Use the test keys while the bot is in paper mode and the competition keys only when you go live (FAQ Q30).
 
-The repo includes `deploy/roostoo-bot.service`, already pointed at the paths
-used above.
+## 3. Checks before starting
 
 ```bash
-sudo cp deploy/roostoo-bot.service /etc/systemd/system/roostoo-bot.service
-sudo systemctl daemon-reload
-sudo systemctl enable roostoo-bot
-sudo systemctl start roostoo-bot
+chronyc tracking | head -3     # clock offset; signed requests are rejected beyond 60 s of drift
+curl -s "https://api.binance.com/api/v3/klines?symbol=ENAUSDT&interval=1h&limit=2" | head -c 200
+curl -s "https://data-api.binance.vision/api/v3/klines?symbol=ENAUSDT&interval=1h&limit=2" | head -c 200
+python -m unittest discover -s tests -t . 2>&1 | tail -3
 ```
 
-Check it's alive and watch logs:
+At least one of the two Binance hosts must answer: the mid-cap signal is built from Binance hourly candles. If neither does, stop and see FAQ Q43 before going further.
+
+## 4. Run
+
+Paper mode is the default and needs no keys: it reads the public ticker and simulates fills.
+
 ```bash
-sudo systemctl status roostoo-bot
+sudo ./deploy/install_service.sh          # systemd service: restarts on crash and on reboot
 tail -f logs/bot.log
 ```
 
-If the process crashes for any reason, systemd restarts it automatically
-after 10 seconds (`Restart=always`) — this matters for a 14-day unattended
-run, where you don't want one unhandled exception to silently end your
-competition.
+`./deploy/install_service.sh --print` shows the unit without installing it. If you prefer tmux (guide section 6), run `python -m roostoo_bot.main --strategy midcap` inside a tmux session instead; unlike the service it does not survive a reboot.
 
-## Part 5 — Deploying strategy updates during the competition
+State lives in `data_store/` (`midcap_state.json` in paper mode, `midcap_live_state.json` in live mode) and logs in `logs/` (`bot.log`, `events.jsonl` with every fill, `equity.jsonl` with one equity mark per minute). A restart resumes from the state file without re-buying.
+
+## 5. Going live
+
+Do this only after a paper run has covered a 00:00 UTC rebalance and the checklist in `docs/LIVE_READINESS.md` is complete. Going live is its own commit that sets `DRY_RUN = False` in `main.py` and `LIVE_TRADING_ENABLED = True` in `config.py`, so the history shows when it happened. Then put the competition keys in `.env`, `git pull`, and `sudo systemctl restart roostoo-bot`. Live uses its own state file.
+
+## 6. Changing the strategy during the competition
 
 ```bash
-# on your laptop: commit and push as normal
-git add .
-git commit -m "tune: adjust MIN_CONFIDENCE_TO_TRADE based on week-1 results"
-git push
-
-# on the AWS instance:
-cd roostoo_bot_repo
-git pull
-sudo systemctl restart roostoo-bot
+# on your machine: commit with a clear message and push
+# on the instance:
+cd ~/roostoo_bot_repo && git pull && sudo systemctl restart roostoo-bot
 ```
 
-This is also the mechanism that satisfies "no manually called APIs" — all
-trading happens inside the systemd-managed loop, and all strategy changes
-go through a `git push` + `git pull` + `systemctl restart`, never a
-one-off manual script hitting `place_order` directly.
+Keep each change in its own commit; the organizers use the history to check the bot ran autonomously.
 
-## Part 6 — Before going fully live
+## 7. Daily checks
 
-1. **Read README.md and create historical trained-model artifacts first.** Startup deliberately fails without a model. **Run with `DRY_RUN = True`** (default in `main.py`) for at least a
-   few hours after deployment — watch `logs/bot.log` and confirm the
-   decisions it *would* make look sane and reconcile its paper ledger and fill assumptions. `LIVE_TRADING_ENABLED` is also false; live enablement requires a separate review.
-2. Inspect `MiniOrder` and amount precision with the now read-only `scripts/test_min_order.py` before
-   relying on any sizing math near the minimum.
-3. Set up a simple daily check-in (even just SSH-ing in and reading the
-   last day of logs) — "24/7 autonomous" doesn't mean "unmonitored,"
-   especially in week one.
+```bash
+python -m roostoo_bot.scripts.live_score --mode live    # use --mode paper before going live
+tail -n 50 logs/bot.log
+```
+
+Compare the composite with the Roostoo app leaderboard. Reading the app and logs is fine; stopping the bot or placing trades by hand is not. Remember the 8 active trading days requirement: `live_score` lists fills per day.
 
 ## Costs
 
-A `t3.micro` running 24/7 for 14 days costs roughly $3–5 on-demand (or
-nearly free if still inside the AWS free tier). Not a meaningful budget
-concern for this project.
+A `t3.medium` costs roughly $0.05 per hour on demand, about $17 for the 14 days. Stop the instance after the competition ends (the system auto-liquidates positions).

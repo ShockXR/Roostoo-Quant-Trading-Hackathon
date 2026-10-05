@@ -75,9 +75,9 @@ class ExecutionState:
         if equity / self.high_water - 1 <= -threshold:
             self.halted = True  # latched across recovery/restart; do not auto-resume risk
 
-    def slots(self, now):
+    def slots(self, now, limit=None):
         self.trades = [t for t in self.trades if now - t < 3_600_000]
-        return max(0, config.MAX_TRADES_PER_HOUR - len(self.trades))
+        return max(0, (config.MAX_TRADES_PER_HOUR if limit is None else limit) - len(self.trades))
 
 
 class PaperBroker:

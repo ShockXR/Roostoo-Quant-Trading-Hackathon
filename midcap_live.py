@@ -53,6 +53,7 @@ def binance_weights(pairs, spec):
 
 class MidcapEngine(TradingEngine):
     kill_switch = 1.0  # the latched 12% halt is replaced by the staged schedule below
+    trades_per_hour = config.MIDCAP_MAX_TRADES_PER_HOUR
 
     def __init__(self, broker, metadata, signal_source, pairs=None, rebalance=None, state=None,
                  state_path=None, event_path=None, equity_path=None):
@@ -62,13 +63,8 @@ class MidcapEngine(TradingEngine):
         self.pairs = list(config.MIDCAP_PAIRS if pairs is None else pairs)
         self.rebalance = rebalance or RebalanceState()
 
-    def persist(self):
-        if self.state_path:
-            super().persist()
-            path = Path(self.state_path)
-            value = json.loads(path.read_text())
-            value["rebalance"] = asdict(self.rebalance)
-            path.write_text(json.dumps(value, allow_nan=False) + "\n")
+    def state_payload(self):
+        return {**super().state_payload(), "rebalance": asdict(self.rebalance)}
 
     def step(self, quotes, now_ms):
         if self.state.uncertain and not isinstance(self.broker, LiveBroker):
@@ -77,7 +73,8 @@ class MidcapEngine(TradingEngine):
         if set(quotes) != set(self.pairs):
             raise ValueError(f"missing quotes: {sorted(set(self.pairs) - set(quotes))}")
         for q in quotes.values():
-            if not 0 <= now_ms - q.timestamp <= config.MAX_QUOTE_AGE_MS:
+            # Roostoo stamps quotes with its own clock; a small lead over ours is normal.
+            if not -config.MAX_CLOCK_SKEW_MS <= now_ms - q.timestamp <= config.MAX_QUOTE_AGE_MS:
                 raise ValueError("stale/future quote; stop entire cycle")
         snapshot, equity = self.reconcile(quotes, now_ms)
         scale = drawdown_scale(equity / self.state.high_water - 1, config.MIDCAP_DRAWDOWN_SCHEDULE)

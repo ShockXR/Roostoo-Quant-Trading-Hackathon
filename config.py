@@ -170,6 +170,8 @@ MIDCAP_TARGET_DAILY_VOL = 0.015   # team decision 2026-10-05
 MIDCAP_REBALANCE_EVERY_HOURS = 24  # rebalance at 00:00 UTC
 MIDCAP_REBALANCE_DELAY_MS = 120_000  # wait for the hourly kline to close on Binance
 MIDCAP_REBALANCE_BAND = 0.01       # skip per-coin trades under 1% of equity (as in the backtest)
+MIDCAP_MAX_TRADES_PER_HOUR = 40    # replay peak was 19 in one hour; the API budget (about 3 orders/minute) binds first
+MAX_CLOCK_SKEW_MS = 10_000         # tolerated lead of the server clock over this machine's when judging quote age
 MIDCAP_MAX_REJECTIONS_PER_PAIR = 2   # stop retrying a pair the exchange refuses this often per rebalance
 MIDCAP_MAX_REBALANCE_CYCLES = 15   # give up on a rebalance that cannot finish (e.g. repeated rejections)
 # Staged drawdown de-risk from the equity high-water mark: half size beyond 3%, 30% beyond 6%.
@@ -177,4 +179,5 @@ MIDCAP_MAX_REBALANCE_CYCLES = 15   # give up on a rebalance that cannot finish (
 MIDCAP_DRAWDOWN_SCHEDULE = ((0.03, 0.5), (0.06, 0.3))
 MIDCAP_HISTORY_HOURS = 400         # hourly closes fetched for signals (needs at least 169)
 MIDCAP_STATE_PATH = "data_store/midcap_state.json"
+MIDCAP_LIVE_STATE_PATH = "data_store/midcap_live_state.json"  # live and paper state never share a file
 BINANCE_KLINE_URLS = ("https://api.binance.com/api/v3/klines", "https://data-api.binance.vision/api/v3/klines")

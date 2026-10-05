@@ -1,4 +1,5 @@
 """Mid-cap live engine: backtest parity, rebalance schedule, de-risk and restarts (offline)."""
+import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 import numpy as np
@@ -7,6 +8,7 @@ import requests
 from roostoo_bot import config, midcap_live
 from roostoo_bot.data import binance_live
 from roostoo_bot.execution.portfolio import PaperBroker, Quote
+from roostoo_bot.main import TradingEngine
 from roostoo_bot.strategies import midcap
 from .fixtures import metadata
 from .test_midcap import random_panel
@@ -184,6 +186,34 @@ class MidcapEngineTests(OfflineCase):
         with self.assertRaises(ValueError):
             engine.step(self.quotes(now - 10 * 60_000), now)
         self.assertEqual(engine.broker.state.longs, {})
+
+    def test_server_clock_slightly_ahead_of_ours_is_tolerated_but_far_ahead_is_not(self):
+        engine = self.engine()
+        now = DAY0 + DAY + 3 * 60_000
+        ahead = {p: Quote(v, v * .9999, v * 1.0001, now + 3_000) for p, v in zip(PAIRS, (10., 20., 30.))}
+        self.assertTrue(engine.step(ahead, now))
+        far = {p: Quote(v, v * .9999, v * 1.0001, now + 5 * 60_000) for p, v in zip(PAIRS, (10., 20., 30.))}
+        with self.assertRaises(ValueError):
+            self.engine().step(far, now)
+
+    def test_state_file_is_written_atomically_and_round_trips(self):
+        path = Path(self.temp.name) / "midcap.json"
+        engine = self.engine(state_path=str(path))
+        now = DAY0 + DAY + 3 * 60_000
+        engine.step(self.quotes(now), now)
+        self.assertFalse(list(path.parent.glob("midcap.json.tmp")))
+        saved = json.loads(path.read_text())
+        self.assertEqual(saved["rebalance"]["hour_ms"], DAY0 + DAY)
+        self.assertIn("portfolio", saved)
+        with patch("roostoo_bot.main.Path.replace", side_effect=OSError("disk full")):
+            with self.assertRaises(OSError):
+                engine.persist()
+        self.assertEqual(json.loads(path.read_text()), saved)  # the old file survives a failed write
+
+    def test_hourly_order_limit_is_wide_enough_for_a_rebalance_plus_a_de_risk(self):
+        self.assertGreaterEqual(config.MIDCAP_MAX_TRADES_PER_HOUR, 30)
+        self.assertEqual(midcap_live.MidcapEngine.trades_per_hour, config.MIDCAP_MAX_TRADES_PER_HOUR)
+        self.assertIsNone(TradingEngine.trades_per_hour)
 
     def test_rebalance_hour_rounding(self):
         self.assertEqual(midcap_live.latest_rebalance_hour(DAY0 + DAY + 119_999, 24, 120_000), DAY0)

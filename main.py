@@ -31,6 +31,7 @@ def atomic_json(path, payload):
 
 class TradingEngine:
     kill_switch = None  # drawdown fraction that latches a halt; None uses config.MAX_DRAWDOWN_KILL_SWITCH
+    trades_per_hour = None  # None uses config.MAX_TRADES_PER_HOUR
     rejected = ()       # pairs whose orders the exchange refused in the latest submit_orders call
     def __init__(self, broker, metadata, models=None, strategy="model", state=None, state_path=None, event_path=None,
                  equity_path=None):
@@ -41,12 +42,15 @@ class TradingEngine:
         self.state = state or ExecutionState()
         self.state_path, self.event_path, self.equity_path = state_path, event_path, equity_path
 
+    def state_payload(self):
+        value = {"execution": asdict(self.state), "mode": "paper" if isinstance(self.broker, PaperBroker) else "live"}
+        if isinstance(self.broker, PaperBroker):
+            value["portfolio"] = asdict(self.broker.state)
+        return value
+
     def persist(self):
         if self.state_path:
-            value = {"execution": asdict(self.state), "mode": "paper" if isinstance(self.broker, PaperBroker) else "live"}
-            if isinstance(self.broker, PaperBroker):
-                value["portfolio"] = asdict(self.broker.state)
-            atomic_json(self.state_path, value)
+            atomic_json(self.state_path, self.state_payload())
 
     def log_equity(self, now_ms, equity):
         # One mark per cycle; scripts/live_score.py turns these into the daily composite score.
@@ -129,7 +133,7 @@ class TradingEngine:
         events = []
         self.rejected = []
         for order in orders:
-            if not self.state.slots(now_ms):
+            if not self.state.slots(now_ms, self.trades_per_hour):
                 break
             if isinstance(self.broker, LiveBroker) and not self.broker.can_submit():
                 break
@@ -234,7 +238,7 @@ def main():
         info = get_exchange_info()
         if not info or not info.get("IsRunning"):
             parser.error("exchange metadata unavailable/not running")
-        engine = midcap_live.build(info["TradePairs"], live=not DRY_RUN, state_path=args.state or config.MIDCAP_STATE_PATH,
+        engine = midcap_live.build(info["TradePairs"], live=not DRY_RUN, state_path=args.state or (config.MIDCAP_STATE_PATH if DRY_RUN else config.MIDCAP_LIVE_STATE_PATH),
                                    event_path=args.events, equity_path=args.equity)
         log.info("Starting mid-cap sleeve in %s mode", "paper" if DRY_RUN else "live")
         midcap_live.run_forever(engine)
