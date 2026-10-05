@@ -16,15 +16,13 @@ import math
 from pathlib import Path
 import pandas as pd
 from ..backtest.portfolio import DEFAULT_COST_PER_SIDE, block_scores, evaluate, load_hourly_panel, simulate
-from ..strategies.midcap import Spec, build_weights
+from ..strategies.midcap import BLEND_PARTS, Spec, build_weights
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "binance_data" / "processed" / "parquet"
 RESULTS_DIR = ROOT / "binance_data" / "results"
 SYMBOLS = ["ENAUSDT", "FETUSDT", "WLDUSDT", "UNIUSDT", "TAOUSDT", "ONDOUSDT", "AAVEUSDT", "VIRTUALUSDT", "HBARUSDT",
            "ARBUSDT", "ICPUSDT", "FILUSDT", "SEIUSDT", "APTUSDT", "ASTERUSDT", "XLMUSDT", "PUMPUSDT"]
-BLEND_PARTS = [{"signal": "momentum", "params": {"lookback": 24, "top_k": 5}},
-               {"signal": "momentum", "params": {"lookback": 168, "top_k": 3}}]
 PERIODS = {"research": ("2026-04-08", "2026-08-01"), "validation": ("2026-08-01", "2026-09-01"),
            "holdout": ("2026-09-01", "2026-10-05")}
 

@@ -63,6 +63,25 @@ class PortfolioSimulationTests(OfflineCase):
         with self.assertRaises(ValueError):
             simulate(panel, pd.DataFrame({"A": [.6, .6], "B": [.6, .6]}, index=panel.signal.index))
 
+    def test_drawdown_schedule_cuts_at_once_and_restores_only_at_rebalance(self):
+        prices = [100., 100., 96., 94., 99., 100., 100.]
+        panel = panel_from({"A": prices})
+        weights = pd.DataFrame({"A": [1., np.nan, np.nan, np.nan, np.nan, 1., np.nan]}, index=panel.signal.index)
+        result = simulate(panel, weights, cost_per_side=0., liquidate=False, drawdown_schedule=((.03, .5), (.05, .25)))
+        # -4% halves at once, -5% quarters; recovery to -3.5% restores 0.5 only at the next rebalance.
+        self.assertEqual(list(result.scale), [1., 1., .5, .25, .25, .5, .5])
+        self.assertAlmostEqual(result.equity.iloc[3], 100_000. - 1000. * 4 - 500. * 2)  # 1000 units, halved at 96
+        self.assertEqual(list(result.fills), [1, 0, 1, 1, 0, 1, 0])
+
+    def test_drawdown_scale_levels(self):
+        schedule = ((.03, .5), (.05, .25))
+        self.assertEqual(midcap.drawdown_scale(-.01, schedule), 1.)
+        self.assertEqual(midcap.drawdown_scale(-.03, schedule), .5)
+        self.assertEqual(midcap.drawdown_scale(-.2, schedule), .25)
+        self.assertEqual(midcap.drawdown_scale(-.2, None), 1.)
+        with self.assertRaises(ValueError):
+            midcap.drawdown_scale(-.2, ((.05, 0.),))
+
     def test_short_profits_when_price_falls(self):
         panel = panel_from({"A": [100., 90.]})
         weights = pd.DataFrame({"A": [-.5, np.nan]}, index=panel.signal.index)

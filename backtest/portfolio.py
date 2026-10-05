@@ -15,6 +15,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from ..scoring import score_equity
+from ..strategies.midcap import drawdown_scale
 
 DEFAULT_COST_PER_SIDE = 0.0015  # 0.10% taker fee + ~0.02% half spread + 0.03% slippage
 
@@ -59,7 +60,7 @@ def _utc(value):
 
 
 def simulate(panel, weights, start=None, end=None, capital=100_000., cost_per_side=DEFAULT_COST_PER_SIDE,
-             band=0.01, liquidate=True):
+             band=0.01, liquidate=True, drawdown_schedule=None):
     """Run target weights through a cash/units ledger.
 
     weights: DataFrame on the panel's index/columns. A row of NaN means "no
@@ -67,6 +68,10 @@ def simulate(panel, weights, start=None, end=None, capital=100_000., cost_per_si
     symbols are 0). band: per-asset trades smaller than this fraction of
     equity are skipped unless they close the position.
     Window is [start, end).
+    drawdown_schedule: staged de-risk as in strategies.midcap.drawdown_scale,
+    measured from the window's peak equity (starting capital included). A
+    lower scale is applied at once by shrinking holdings; a higher scale only
+    returns at the next rebalance, as in the live engine.
     """
     index = panel.signal.index
     window = index[(index >= _utc(start)) if start is not None else np.ones(len(index), bool)]
@@ -83,16 +88,27 @@ def simulate(panel, weights, start=None, end=None, capital=100_000., cost_per_si
     sig = panel.signal.loc[window].to_numpy(dtype=float)
     exe = panel.execution.loc[window].to_numpy(dtype=float)
     cash, units = float(capital), np.zeros(len(columns))
-    equity, fills, turnover, gross, costs = (np.zeros(len(window)) for _ in range(5))
+    equity, fills, turnover, gross, costs, scales = (np.zeros(len(window)) for _ in range(6))
+    peak, applied = float(capital), 1.
     for i in range(len(window)):
         equity[i] = cash + units @ sig[i]
         gross[i] = np.abs(units * sig[i]).sum() / equity[i]
-        if not rebalance[i]:
+        peak = max(peak, equity[i])
+        previous = applied
+        scale = drawdown_scale(equity[i] / peak - 1, drawdown_schedule)
+        de_risk = scale < previous
+        if de_risk or rebalance[i]:
+            applied = scale
+        scales[i] = applied
+        if not rebalance[i] and not de_risk:
             continue
         before = cash + units @ exe[i]
         if before <= 0:
             raise ValueError("equity exhausted")
-        desired = w[i] * before / exe[i]
+        if rebalance[i]:
+            desired = w[i] * applied * before / exe[i]
+        else:
+            desired = units * applied / previous
         trade = desired - units
         notional = np.abs(trade * exe[i])
         skip = (notional < band * before) & (desired != 0)
@@ -109,8 +125,8 @@ def simulate(panel, weights, start=None, end=None, capital=100_000., cost_per_si
         exit_cost = np.abs(units * sig[-1]).sum() * cost_per_side
         equity[-1] -= exit_cost
         costs[-1] += exit_cost
-    return pd.DataFrame({"equity": equity, "fills": fills, "turnover": turnover, "gross": gross, "costs": costs},
-                        index=window)
+    return pd.DataFrame({"equity": equity, "fills": fills, "turnover": turnover, "gross": gross, "costs": costs,
+                         "scale": scales}, index=window)
 
 
 def evaluate(result, capital=100_000., start=None):

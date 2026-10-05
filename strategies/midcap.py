@@ -128,6 +128,22 @@ def crash_gate(panel, drop=0.08, low=0.25, below_trend=0.5, trend_hours=168):
     return pd.Series(np.where(fall, low, np.where(weak, below_trend, 1.)), index=index.index)
 
 
+def drawdown_scale(drawdown, schedule):
+    """Exposure multiplier for the current drawdown (a negative fraction).
+
+    schedule: ((threshold, scale), ...) with thresholds as positive fractions,
+    e.g. ((0.03, 0.5), (0.05, 0.25)) halves exposure beyond a 3% drawdown and
+    quarters it beyond 5%. Scales never reach 0, so the bot keeps trading.
+    """
+    scale = 1.
+    for threshold, level in sorted(schedule or ()):
+        if not 0 < level <= 1:
+            raise ValueError("drawdown scales must be in (0, 1]")
+        if -drawdown >= threshold:
+            scale = level
+    return scale
+
+
 @dataclass(frozen=True)
 class Spec:
     name: str
@@ -169,3 +185,14 @@ def build_weights(panel, spec):
         sized = sized.mul(crash_gate(panel, **spec.gate), axis=0)
     out = sized.where(pd.Series(mask, index=sized.index), np.nan, axis=0)
     return out
+
+
+BLEND_PARTS = [{"signal": "momentum", "params": {"lookback": 24, "top_k": 5}},
+               {"signal": "momentum", "params": {"lookback": 168, "top_k": 3}}]
+
+
+def live_spec(config):
+    """The strategy the live bot runs: two-lookback momentum blend, daily, volatility-targeted."""
+    return Spec("blend_live", "blend", {"parts": BLEND_PARTS}, every=config.MIDCAP_REBALANCE_EVERY_HOURS,
+                target_daily_vol=config.MIDCAP_TARGET_DAILY_VOL, max_weight=config.MAX_POSITION_PER_ASSET,
+                max_gross=config.MAX_PORTFOLIO_EXPOSURE)

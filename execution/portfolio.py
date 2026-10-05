@@ -69,9 +69,10 @@ class ExecutionState:
     trades: list = field(default_factory=list)
     last_order_quote: dict = field(default_factory=dict)
 
-    def mark(self, equity):
+    def mark(self, equity, kill_switch=None):
         self.high_water = max(self.high_water, equity)
-        if equity / self.high_water - 1 <= -config.MAX_DRAWDOWN_KILL_SWITCH:
+        threshold = config.MAX_DRAWDOWN_KILL_SWITCH if kill_switch is None else kill_switch
+        if equity / self.high_water - 1 <= -threshold:
             self.halted = True  # latched across recovery/restart; do not auto-resume risk
 
     def slots(self, now):
@@ -152,8 +153,12 @@ class PaperBroker:
         return event
 
 
-def plan_orders(targets, snapshot, quotes, metadata):
-    """Reduce existing risk first; a direction flip closes before next-cycle entry."""
+def plan_orders(targets, snapshot, quotes, metadata, min_fraction=None):
+    """Reduce existing risk first; a direction flip closes before next-cycle entry.
+
+    min_fraction: per-pair deadband as a fraction of equity (default config.MIN_REBALANCE_FRACTION).
+    """
+    band = config.MIN_REBALANCE_FRACTION if min_fraction is None else min_fraction
     equity = snapshot.equity(quotes)
     quantities = snapshot.quantities()
     current_gross = sum(abs(v) * quotes[p].price for p, v in quantities.items()) / equity
@@ -179,7 +184,7 @@ def plan_orders(targets, snapshot, quotes, metadata):
         delta = desired - current
         excess_reduction = abs(desired) < abs(current) and (
             abs(current) * q.price / equity > config.MAX_POSITION_PER_ASSET or current_gross > config.MAX_PORTFOLIO_EXPOSURE)
-        if abs(delta) * q.price < config.MIN_REBALANCE_FRACTION * equity and desired != 0 and not excess_reduction:
+        if abs(delta) * q.price < band * equity and desired != 0 and not excess_reduction:
             continue
         if current > 0 and delta < 0:
             quantity = sizing.round_quantity(min(current, -delta), meta["AmountPrecision"])
