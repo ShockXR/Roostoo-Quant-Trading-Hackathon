@@ -23,3 +23,11 @@ logs/
 .DS_Store
 .vscode/
 .idea/
+
+# Locally trained artifacts and build output
+models/
+*.joblib
+build/
+dist/
+
+binance_data/

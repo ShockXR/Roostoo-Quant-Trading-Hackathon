@@ -75,7 +75,7 @@ MARKET_PROXY = "BTC/USD"  # used for "return relative to market" features
 POLL_INTERVAL_SECONDS = 60      # how often we hit /v3/ticker (1 min)
 STORE_DIR = "data_store"        # local parquet files, one per pair
 
-# --- Competition rules (confirmed) ---
+# --- Competition assumptions; verify against current organizer rules ---
 INITIAL_CAPITAL = 100_000.0
 COMPETITION_DURATION_DAYS = 14
 NO_LEVERAGE = True          # spot only, 1x long/short -- our short sizing already honors this
@@ -99,7 +99,7 @@ TARGET_HORIZON = 10          # bars ahead we're predicting (tune with POLL_INTER
 # threshold should be > round-trip cost + margin (see COST section below)
 TARGET_MODE = "threshold"    # "regression" | "direction" | "threshold"
 
-# --- Transaction costs: CONFIRMED from hackathon rules ---
+# --- Research fee assumptions; reconcile spot fees with account/rules ---
 TAKER_FEE = 0.001              # 0.10% market order
 MAKER_FEE = 0.0005              # 0.05% limit order
 ROUND_TRIP_COST_ESTIMATE = TAKER_FEE * 2   # worst case, two taker fills
@@ -119,6 +119,11 @@ MAX_PORTFOLIO_EXPOSURE = 0.7      # fraction of capital deployed at once
 MAX_TRADES_PER_HOUR = 20
 MAX_DRAWDOWN_KILL_SWITCH = 0.12   # Calmar = return / max drawdown, so capping drawdown directly protects this metric
 MIN_CONFIDENCE_TO_TRADE = 0.55     # model probability threshold to act at all
+# Per-bar realized vol (REGIME_VOL_WINDOW-bar std of 1m returns) above which
+# position size is shrunk proportionally. ~median for SOL 1m, Jul-Sep 2026
+# (median 0.00057, p75 0.00079); the old 0.01 was never reached on 1m bars,
+# so the vol shrink was a no-op. Re-tune if POLL_INTERVAL_SECONDS changes.
+SIZING_REFERENCE_VOL = 0.0006
 
 # --- Component switches (used by the ablation harness) ---
 COMPONENTS = {
@@ -137,3 +142,19 @@ WALKFORWARD_VAL_BARS = 500
 WALKFORWARD_STEP_BARS = 500
 
 RANDOM_SEED = 42
+
+# Paper is the default. Changing DRY_RUN alone cannot enable orders.
+LIVE_TRADING_ENABLED = False
+ALLOW_SHORTS = False  # verify that this competition permits short positions
+MAX_QUOTE_AGE_MS = 120_000
+MAX_HISTORY_GAP_MS = 120_000
+MIN_REBALANCE_FRACTION = 0.002
+SHORT_FEE = 0.001  # official /v6 short fee, both market and limit
+MAX_API_CALLS_PER_MINUTE = 30
+CROSS_SECTIONAL_HORIZON = 5
+MEAN_REVERSION_THRESHOLD = 1.5
+CROSS_SECTIONAL_LONG_PERCENTILE = 0.7
+CROSS_SECTIONAL_SHORT_PERCENTILE = 0.3
+MODEL_DIR = "models"
+PAPER_STATE_PATH = "data_store/paper_state.json"
+EVENT_LOG_PATH = "logs/events.jsonl"

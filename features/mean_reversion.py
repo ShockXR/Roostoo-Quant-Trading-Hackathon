@@ -21,6 +21,9 @@ def _rsi(prices: pd.Series, window: int) -> pd.Series:
     avg_loss = loss.rolling(window).mean()
     rs = avg_gain / avg_loss.replace(0, np.nan)
     rsi = 100 - (100 / (1 + rs))
+    rsi = rsi.mask((avg_loss == 0) & (avg_gain > 0), 100.)
+    rsi = rsi.mask((avg_gain == 0) & (avg_loss > 0), 0.)
+    rsi = rsi.mask((avg_gain == 0) & (avg_loss == 0), 50.)
     return rsi
 
 
@@ -34,7 +37,7 @@ def add_mean_reversion_features(df: pd.DataFrame, price_col: str = "last_price")
     # core z-score: distance from rolling mean in standard-deviation units.
     # large positive z -> price stretched above its recent mean.
     # large negative z -> price stretched below its recent mean.
-    df["zscore"] = (df[price_col] - roll_mean) / roll_std.replace(0, np.nan)
+    df["zscore"] = ((df[price_col] - roll_mean) / roll_std.replace(0, np.nan)).mask(roll_std == 0, 0.)
 
     # rate of change of the z-score itself: is the stretch accelerating
     # (still moving away, "catching the falling knife" risk) or decelerating
@@ -50,7 +53,7 @@ def add_mean_reversion_features(df: pd.DataFrame, price_col: str = "last_price")
     upper = bb_mean + bb_std_mult * bb_std
     lower = bb_mean - bb_std_mult * bb_std
     # position within the bands, 0 = lower band, 1 = upper band
-    df["bollinger_pct"] = (df[price_col] - lower) / (upper - lower).replace(0, np.nan)
+    df["bollinger_pct"] = ((df[price_col] - lower) / (upper - lower).replace(0, np.nan)).mask(bb_std == 0, .5)
 
     # short-term reversal return: negative of the most recent short move,
     # a naive "would betting against the last move have worked" feature

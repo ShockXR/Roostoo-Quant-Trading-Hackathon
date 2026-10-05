@@ -1,49 +1,39 @@
-"""
-Position sizing. Deliberately kept simple and explicit: size scales with
-model confidence and shrinks with realized volatility, clipped to hard
-risk limits. This layer matters more to overall PnL than small gains in
-model accuracy -- a mediocre model with disciplined sizing beats a great
-model with none.
-"""
+"""Risk sizing in fractions of equity; quantity conversion is separate."""
+import math
+from decimal import Decimal, ROUND_DOWN
 from . import config
 
 
-def confidence_to_size(
-    proba: float,
-    realized_vol: float,
-    min_confidence: float = config.MIN_CONFIDENCE_TO_TRADE,
-    max_position: float = config.MAX_POSITION_PER_ASSET,
-) -> float:
-    """
-    Returns a fraction of capital to allocate to this asset, in [0, max_position].
-    proba: model's confidence the trade clears the target threshold.
-    realized_vol: recent realized volatility (used to shrink size in choppy/violent markets).
-    """
-    if proba < min_confidence:
-        return 0.0
-
-    # confidence above the minimum threshold scales size linearly to max_position
-    confidence_scale = (proba - min_confidence) / max(1e-6, 1 - min_confidence)
-    raw_size = confidence_scale * max_position
-
-    # volatility-aware shrink: normalize against a reference vol level.
-    # if realized_vol is missing/zero, don't scale (avoid div-by-zero blowups).
-    reference_vol = 0.01  # tune from historical realized_vol distribution
-    if realized_vol and realized_vol > 0:
-        vol_scale = min(1.0, reference_vol / realized_vol)
-        raw_size *= vol_scale
-
-    return max(0.0, min(raw_size, max_position))
+def confidence_to_size(proba, realized_vol, min_confidence=None, max_position=None):
+    minimum = config.MIN_CONFIDENCE_TO_TRADE if min_confidence is None else min_confidence
+    cap = config.MAX_POSITION_PER_ASSET if max_position is None else max_position
+    if not 0 <= minimum < 1 or not 0 <= cap <= 1:
+        raise ValueError("invalid confidence threshold or position cap")
+    if not math.isfinite(proba) or not 0 <= proba <= 1 or proba < minimum:
+        return 0.
+    if realized_vol is None or not math.isfinite(realized_vol) or realized_vol < 0:
+        return 0.
+    vol_scale = min(1., config.SIZING_REFERENCE_VOL / realized_vol) if realized_vol > 0 else 1.
+    return min(cap, max(0., (proba - minimum) / (1 - minimum) * cap * vol_scale))
 
 
-def enforce_portfolio_limits(
-    proposed_sizes: dict[str, float],
-    max_total_exposure: float = config.MAX_PORTFOLIO_EXPOSURE,
-) -> dict[str, float]:
-    """Scales all proposed sizes down proportionally if their sum exceeds
-    the portfolio-wide exposure cap."""
-    total = sum(proposed_sizes.values())
-    if total <= max_total_exposure or total == 0:
-        return proposed_sizes
-    scale = max_total_exposure / total
-    return {k: v * scale for k, v in proposed_sizes.items()}
+def enforce_portfolio_limits(proposed_sizes, max_total_exposure=None):
+    cap = config.MAX_PORTFOLIO_EXPOSURE if max_total_exposure is None else max_total_exposure
+    if not 0 <= cap <= 1 or any(not math.isfinite(v) for v in proposed_sizes.values()):
+        raise ValueError("invalid exposure budget or allocation")
+    clipped = {k: max(-config.MAX_POSITION_PER_ASSET, min(v, config.MAX_POSITION_PER_ASSET)) for k, v in proposed_sizes.items()}
+    total = sum(abs(v) for v in clipped.values())
+    scale = min(1., cap / total) if total else 1.
+    return {k: v * scale for k, v in clipped.items()}
+
+
+def round_quantity(quantity, precision):
+    if not math.isfinite(quantity) or quantity < 0 or not isinstance(precision, int) or not 0 <= precision <= 18:
+        raise ValueError("invalid quantity or amount precision")
+    return float(Decimal(str(quantity)).quantize(Decimal(1).scaleb(-precision), rounding=ROUND_DOWN))
+
+
+def capital_to_quantity(fraction, equity, price, precision):
+    if not all(math.isfinite(v) for v in (fraction, equity, price)) or equity <= 0 or price <= 0:
+        raise ValueError("invalid sizing inputs")
+    return round_quantity(abs(fraction) * equity / price, precision)

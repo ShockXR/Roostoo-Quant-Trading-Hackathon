@@ -1,0 +1,1740 @@
+{
+  "generated_utc": "2026-10-04T13:50:28.975650+00:00",
+  "source_commit": "3aa87f58a1349e85f4300ae588f9e420b7c8107c",
+  "handbook_sha256": "4ffdf7b49de946fb75f13b6d9ca4fad415e8de3ea1b340dad52c8c6966c69478",
+  "audit_sha256": "f194c098c4406e2a6b88035d7828460c984bc76196792e6cd4613e192f986eea",
+  "python": "3.12.14",
+  "dependencies": {
+    "numpy": "2.3.5",
+    "pandas": "2.2.3",
+    "scikit-learn": "1.9.1",
+    "requests": "2.34.2",
+    "pyarrow": "25.0.1"
+  },
+  "scope": "Synthetic behavioral contracts and source inspection; no historical profitability or venue/rule verification. All exchange order calls mocked; network blocked.",
+  "source_hashes": {
+    "__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "backtest/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "backtest/ablation.py": "a23d95d857e14c92e36ddb5928c5ba8916e2cdd9c5e0141ee9e1a6da89cbd3ff",
+    "backtest/engine.py": "9d6f348243c433d95961543a69eaccbd1f99e44a6fbd3d0ce8157cb0dff735cd",
+    "config.py": "69ac7dbd369a8601b741969f3a6c38714abd41a170a53ae8375d4da699a34776",
+    "costs.py": "d26b5bed3f807bf3ede2cde31af936782fb3f36e2852b5174b2eed54bc38f0eb",
+    "data/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "data/collector.py": "6aac0dea8fa493fdab64f7b1ab2915dd0592a314e4e26cfab8d90a764163d0dd",
+    "data/store.py": "6022246cd8a49126aca89d7f59a2fe8d83df747e9479fa9199e1b94bf9b856ef",
+    "execution/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "execution/auth.py": "cd911de0913e3b0795578715807e6ae18e60d707556f85ceb6872e1b4cc99c73",
+    "execution/trader.py": "a94f9626be50f0328b47f3c684b7cad268c9b059c5d4d7579683fdade664cabd",
+    "features/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "features/build_features.py": "6da5644168e87bf686eb8b9fcad970640112cee56784fb498b8f78fd3ef968d0",
+    "features/cross_sectional.py": "a15ffd7aa42507cef2e08ae36a4d095665b515d37cf718d1e5b4d7ca6d8ab379",
+    "features/mean_reversion.py": "8efe922a4b8e2706b8870eb4e1dba67e2cdbbb60702619ed0f58cbc6ae32e0f7",
+    "features/momentum.py": "e0a69bb33324ecd548823e91bf1ce63e5285e13f059c5d94b3a6624033c71db1",
+    "features/regime.py": "2654925697461b693cd7e87f83dee389c5194fc28e71cd29851de85526e21321",
+    "main.py": "c70f567974f5dd2e05f6ffd2850957f10136b8398b9c3907dbdcf07a034471b0",
+    "model/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "model/targets.py": "ef1f8ae7c013bd530cb5e388eadd9d02eade06ef3cf242caaae5e7b9144ffd5e",
+    "model/train.py": "33919a129ca48a1a6987b2cf52b4ae2b3e635c444e672f37368753394ffe47af",
+    "scripts/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "scripts/test_min_order.py": "e1edd37a41fc919794e2cb249042b4bdca2d5d2c38140a72b13bc6724945816b",
+    "sizing.py": "71dd03d1268fc2f67a5f5ae6ec3b8075dd1525b6f04c2da5027fce813674fed9"
+  },
+  "counts": {
+    "PASS": 9,
+    "FAIL": 24
+  },
+  "checks": [
+    {
+      "check": "momentum formulas and direction",
+      "handbook_parts": [
+        7,
+        21
+      ],
+      "source": {
+        "path": "features/momentum.py",
+        "line": 17
+      },
+      "evidence": "Multi-horizon returns and MA direction match monotonic trend fixtures.",
+      "status": "PASS"
+    },
+    {
+      "check": "mean reversion stretch features",
+      "handbook_parts": [
+        7,
+        21
+      ],
+      "source": {
+        "path": "features/mean_reversion.py",
+        "line": 37
+      },
+      "evidence": "Isolated dip/spike produces opposite z-scores and outside-band readings.",
+      "status": "PASS"
+    },
+    {
+      "check": "RSI uninterrupted gains",
+      "handbook_parts": [
+        7,
+        21
+      ],
+      "source": {
+        "path": "features/mean_reversion.py",
+        "line": 22
+      },
+      "status": "FAIL",
+      "evidence": "RSI on uninterrupted gains should be 100; observed nan."
+    },
+    {
+      "check": "cross-sectional winner ranking",
+      "handbook_parts": [
+        21
+      ],
+      "source": {
+        "path": "features/cross_sectional.py",
+        "line": 31
+      },
+      "evidence": "Faster-growing asset receives higher cross-sectional rank.",
+      "status": "PASS"
+    },
+    {
+      "check": "feature prefix invariance",
+      "handbook_parts": [
+        3,
+        12
+      ],
+      "source": {
+        "path": "features/build_features.py",
+        "line": 26
+      },
+      "evidence": "Appending future ticks does not change previous features (two assets, all groups).",
+      "status": "PASS"
+    },
+    {
+      "check": "regression unknown target masking",
+      "handbook_parts": [
+        12,
+        23
+      ],
+      "source": {
+        "path": "model/targets.py",
+        "line": 20
+      },
+      "evidence": "Unknown regression outcomes: [nan, nan, nan, nan, nan, nan, nan, nan, nan, nan]; expected all NaN.",
+      "status": "PASS"
+    },
+    {
+      "check": "direction unknown target masking",
+      "handbook_parts": [
+        12,
+        23
+      ],
+      "source": {
+        "path": "model/targets.py",
+        "line": 21
+      },
+      "status": "FAIL",
+      "evidence": "Unknown direction outcomes: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; expected all NaN."
+    },
+    {
+      "check": "threshold unknown target masking",
+      "handbook_parts": [
+        12,
+        23
+      ],
+      "source": {
+        "path": "model/targets.py",
+        "line": 22
+      },
+      "status": "FAIL",
+      "evidence": "Unknown threshold outcomes: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; expected all NaN."
+    },
+    {
+      "check": "walk-forward label purge",
+      "handbook_parts": [
+        13,
+        23
+      ],
+      "source": {
+        "path": "model/train.py",
+        "line": 33
+      },
+      "status": "FAIL",
+      "evidence": "Last training label ends at row 2009; validation starts at 2000. No horizon purge."
+    },
+    {
+      "check": "leakage guard rejects future features",
+      "handbook_parts": [
+        12
+      ],
+      "source": {
+        "path": "features/build_features.py",
+        "line": 58
+      },
+      "status": "FAIL",
+      "evidence": "Guard accepted a deliberately future-shifted price feature; only checks index ordering."
+    },
+    {
+      "check": "individual sizing bounds and volatility shrink",
+      "handbook_parts": [
+        9,
+        19
+      ],
+      "source": {
+        "path": "sizing.py",
+        "line": 11
+      },
+      "evidence": "Low confidence is flat, elevated volatility reduces size, per-asset cap holds for valid inputs.",
+      "status": "PASS"
+    },
+    {
+      "check": "long-only portfolio cap helper",
+      "handbook_parts": [
+        19,
+        20
+      ],
+      "source": {
+        "path": "sizing.py",
+        "line": 39
+      },
+      "evidence": "Standalone helper caps positive allocations at 70%.",
+      "status": "PASS"
+    },
+    {
+      "check": "signed gross exposure cap",
+      "handbook_parts": [
+        19,
+        20
+      ],
+      "source": {
+        "path": "sizing.py",
+        "line": 45
+      },
+      "status": "FAIL",
+      "evidence": "+60%/-60% proposals leave gross exposure 120.0%, cap 70.0%."
+    },
+    {
+      "check": "probability is not expected return",
+      "handbook_parts": [
+        4,
+        17,
+        23
+      ],
+      "source": {
+        "path": "main.py",
+        "line": 42
+      },
+      "status": "FAIL",
+      "evidence": "p=0.6, avg_win=0.003, avg_loss=0.008: expected gross return=-0.1400%; p-0.5 proxy=10.0%. Proxy accepts negative-expectancy trade."
+    },
+    {
+      "check": "default entry point predicts",
+      "handbook_parts": [
+        25,
+        27
+      ],
+      "source": {
+        "path": "main.py",
+        "line": 23
+      },
+      "status": "FAIL",
+      "evidence": "Default run_once(model=None) makes no predictions; entry point passes no trained model."
+    },
+    {
+      "check": "live portfolio exposure cap",
+      "handbook_parts": [
+        19,
+        20
+      ],
+      "source": {
+        "path": "main.py",
+        "line": 47
+      },
+      "status": "FAIL",
+      "evidence": "20 simultaneous bullish assets produce intended capital fractions totaling 311.1%; cap is 70.0%. Orders are mocked."
+    },
+    {
+      "check": "capital fraction converted to quantity",
+      "handbook_parts": [
+        9,
+        25
+      ],
+      "source": {
+        "path": "main.py",
+        "line": 55
+      },
+      "status": "FAIL",
+      "evidence": "At $100 price and $100,000 equity, size fraction 0.155556 requires 155.555556 units; submitted 0.155556 units."
+    },
+    {
+      "check": "unchanged target avoids repeat buying",
+      "handbook_parts": [
+        11,
+        25
+      ],
+      "source": {
+        "path": "main.py",
+        "line": 55
+      },
+      "status": "FAIL",
+      "evidence": "Identical target on two polls sends 2 BUY orders; no current-position reconciliation or delta order."
+    },
+    {
+      "check": "hourly trade rate limit",
+      "handbook_parts": [
+        19,
+        26
+      ],
+      "source": {
+        "path": "config.py",
+        "line": 119
+      },
+      "status": "FAIL",
+      "evidence": "Two successive polls submit 40 orders; configured hourly maximum is 20."
+    },
+    {
+      "check": "bearish action or exit path",
+      "handbook_parts": [
+        8,
+        10,
+        25
+      ],
+      "source": {
+        "path": "main.py",
+        "line": 51
+      },
+      "status": "FAIL",
+      "evidence": "p=0.1 produces no sell/short action; positive cost/confidence gates make SELL branch unreachable. No position exits implemented."
+    },
+    {
+      "check": "live prediction schema stability",
+      "handbook_parts": [
+        23,
+        26
+      ],
+      "source": {
+        "path": "main.py",
+        "line": 35
+      },
+      "status": "FAIL",
+      "evidence": "Model called with [['last_price', 'realized_vol']]; training schema ['last_price', 'ret_5', 'realized_vol']. Missing feature silently drops a column instead of skipping the row."
+    },
+    {
+      "check": "final-row exit fee accounting",
+      "handbook_parts": [
+        11,
+        17
+      ],
+      "source": {
+        "path": "backtest/engine.py",
+        "line": 32
+      },
+      "status": "FAIL",
+      "evidence": "Flat-price entry/last-row exit: ending equity=0.999770000, expected=0.999540053; final turnover fee erased by NaN return."
+    },
+    {
+      "check": "drawdown includes starting equity",
+      "handbook_parts": [
+        16
+      ],
+      "source": {
+        "path": "backtest/engine.py",
+        "line": 33
+      },
+      "status": "FAIL",
+      "evidence": "Immediate loss: equity trough 0.898850; reported max drawdown=0.00%; initial capital not included in running peak."
+    },
+    {
+      "check": "Sortino one-loss finite handling",
+      "handbook_parts": [
+        16
+      ],
+      "source": {
+        "path": "backtest/engine.py",
+        "line": 51
+      },
+      "status": "FAIL",
+      "evidence": "One negative return gives Sortino=nan; pandas sample std on one loss is NaN."
+    },
+    {
+      "check": "regime ablation isolates one factor",
+      "handbook_parts": [
+        22,
+        30
+      ],
+      "source": {
+        "path": "backtest/ablation.py",
+        "line": 102
+      },
+      "status": "FAIL",
+      "evidence": "Before/after regime stages receive [('logistic', ['ret_5', 'zscore', 'cs_percentile', 'realized_vol', 'trend_strength']), ('random_forest', ['ret_5', 'zscore', 'cs_percentile', 'realized_vol', 'trend_strength'])]; same features, different model families. Regime contribution is not isolated."
+    },
+    {
+      "check": "optional null data preserves training rows",
+      "handbook_parts": [
+        3,
+        23
+      ],
+      "source": {
+        "path": "backtest/ablation.py",
+        "line": 34
+      },
+      "status": "FAIL",
+      "evidence": "One optional raw ticker field set to None deletes every training row via blanket dropna; model silently falls back to zero positions."
+    },
+    {
+      "check": "duplicate tick protection",
+      "handbook_parts": [
+        3
+      ],
+      "source": {
+        "path": "data/store.py",
+        "line": 25
+      },
+      "status": "FAIL",
+      "evidence": "Appending the same tick twice retains 2 rows with duplicate timestamps."
+    },
+    {
+      "check": "stale quote handling",
+      "handbook_parts": [
+        3,
+        26
+      ],
+      "source": {
+        "path": "features/build_features.py",
+        "line": 22
+      },
+      "status": "FAIL",
+      "evidence": "ETH quote at timestamp 0 is forward-filled to timestamp 180000 without freshness/age limit."
+    },
+    {
+      "check": "ambiguous order timeout not blindly retried",
+      "handbook_parts": [
+        26
+      ],
+      "source": {
+        "path": "execution/trader.py",
+        "line": 24
+      },
+      "status": "FAIL",
+      "evidence": "Ambiguous order timeout results in 3 POST attempts without reconciliation/idempotency."
+    },
+    {
+      "check": "live component switches honored",
+      "handbook_parts": [
+        22,
+        29
+      ],
+      "source": {
+        "path": "config.py",
+        "line": 129
+      },
+      "status": "FAIL",
+      "evidence": "ml_model=False, cost_filter=False, position_sizing=False do not disable the corresponding live stages; feature groups alone use component switches."
+    },
+    {
+      "check": "documented service package discoverable",
+      "handbook_parts": [
+        25,
+        29
+      ],
+      "source": {
+        "path": "deploy/roostoo-bot.service",
+        "line": 11
+      },
+      "status": "FAIL",
+      "evidence": "Documented checkout root has no roostoo_bot package or installation metadata; service python -m roostoo_bot.main cannot resolve it."
+    },
+    {
+      "check": "feature-group switches honored",
+      "handbook_parts": [
+        22,
+        29
+      ],
+      "source": {
+        "path": "features/build_features.py",
+        "line": 35
+      },
+      "evidence": "All four feature-group switches remove derived columns when explicitly disabled.",
+      "status": "PASS"
+    },
+    {
+      "check": "classifier execution smoke",
+      "handbook_parts": [
+        23
+      ],
+      "source": {
+        "path": "model/train.py",
+        "line": 54
+      },
+      "evidence": "Logistic trainer executes one 2000/500 fold with finite probabilities on synthetic noisy prices; not a validation of economic edge or leakage safety.",
+      "status": "PASS"
+    }
+  ],
+  "coverage": {
+    "method": "Manual source review against all 34 parts and all 11 Part 21 strategy families, plus AST parameter-use inventory. Feature availability is not proof of learned strategy behavior or economic value.",
+    "strategies": [
+      {
+        "family": "Trend following",
+        "status": "feature_only",
+        "assessment": "MA ratios, slopes and trend strength exist; no standalone MA trend strategy or live trend rule.",
+        "files": [
+          "features/momentum.py",
+          "features/regime.py"
+        ],
+        "handbook_source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1112
+        }
+      },
+      {
+        "family": "Moving-average crossover",
+        "status": "feature_only",
+        "assessment": "SMA fast=5/slow=20 features; no explicit crossover entry/exit baseline; EMA not implemented.",
+        "files": [
+          "features/momentum.py"
+        ],
+        "handbook_source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1112
+        }
+      },
+      {
+        "family": "Momentum",
+        "status": "baseline_and_features",
+        "assessment": "Returns at 1/5/10/20/30 ticks and a ret_5 > 0 long/flat baseline. Live ML can consume features; directional behavior and added value unverified.",
+        "files": [
+          "features/momentum.py",
+          "backtest/ablation.py"
+        ],
+        "handbook_source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1112
+        }
+      },
+      {
+        "family": "Mean reversion",
+        "status": "baseline_and_features",
+        "assessment": "20-tick z-score, z-score change, reversal return; backtest long below -1.5/short above +1.5. Live cannot execute the short baseline or exits.",
+        "files": [
+          "features/mean_reversion.py",
+          "backtest/ablation.py"
+        ],
+        "handbook_source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1112
+        }
+      },
+      {
+        "family": "RSI mean reversion",
+        "status": "feature_only_with_defect",
+        "assessment": "20-tick simple rolling RSI feature; no 30/70 strategy rule. Zero-loss case becomes NaN, including uninterrupted gains.",
+        "files": [
+          "features/mean_reversion.py"
+        ],
+        "handbook_source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1112
+        }
+      },
+      {
+        "family": "Bollinger reversion",
+        "status": "feature_only",
+        "assessment": "20-tick, 2-standard-deviation band position; no dedicated band entry/exit rule.",
+        "files": [
+          "features/mean_reversion.py"
+        ],
+        "handbook_source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1112
+        }
+      },
+      {
+        "family": "Breakout",
+        "status": "missing",
+        "assessment": "No prior-range highs/lows, channel break or breakout entry/exit baseline.",
+        "files": [],
+        "handbook_source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1112
+        }
+      },
+      {
+        "family": "Volatility breakout",
+        "status": "missing",
+        "assessment": "Realized volatility exists as context/sizing input; no return-versus-volatility breakout trigger.",
+        "files": [
+          "features/regime.py",
+          "sizing.py"
+        ],
+        "handbook_source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1112
+        }
+      },
+      {
+        "family": "Volume-based",
+        "status": "raw_data_only",
+        "assessment": "Raw ticker trade-value fields retained, but no relative-volume, volume-change, volume-z-score or confirmation strategy. Raw fields reaching ML is not a defined volume strategy.",
+        "files": [
+          "data/collector.py"
+        ],
+        "handbook_source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1112
+        }
+      },
+      {
+        "family": "Cross-sectional momentum",
+        "status": "baseline_and_features",
+        "assessment": "5-tick ranks/percentiles and relative returns; baseline thresholds 0.7/0.3. No portfolio basket construction, balanced long/short execution or freshness control.",
+        "files": [
+          "features/cross_sectional.py",
+          "backtest/ablation.py"
+        ],
+        "handbook_source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1112
+        }
+      },
+      {
+        "family": "Multi-factor / ensembles",
+        "status": "partial",
+        "assessment": "Averaged momentum/z-score baseline and classifier feature combination exist. Independent contribution, probability calibration and portfolio P&L diversification are untested.",
+        "files": [
+          "backtest/ablation.py",
+          "model/train.py"
+        ],
+        "handbook_source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1112
+        }
+      }
+    ],
+    "handbook_sections": [
+      {
+        "part": 1,
+        "title": "PART 1 \u2014 WHAT ALGORITHMIC TRADING ACTUALLY IS",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 100
+        },
+        "status": "partial",
+        "assessment": "Modular pipeline present, but desired exposure is not converted into reconciled orders."
+      },
+      {
+        "part": 2,
+        "title": "PART 2 \u2014 BASIC MARKET AND CRYPTO TRADING CONCEPTS",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 176
+        },
+        "status": "partial",
+        "assessment": "Ticker/order interfaces present; venue conventions and actual short execution remain unverified."
+      },
+      {
+        "part": 3,
+        "title": "PART 3 \u2014 PRICE DATA AND MARKET DATA",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 225
+        },
+        "status": "defective",
+        "assessment": "Sorting and forward filling present; no duplicate, gap, age or schema protection."
+      },
+      {
+        "part": 4,
+        "title": "PART 4 \u2014 STATISTICS EVERY ALGORITHMIC TRADER SHOULD KNOW",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 311
+        },
+        "status": "partial",
+        "assessment": "Returns, volatility and basic metrics exist; probability is incorrectly treated as expected return."
+      },
+      {
+        "part": 5,
+        "title": "PART 5 \u2014 PROBABILITY AND STATISTICAL THINKING",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 392
+        },
+        "status": "missing_research_evidence",
+        "assessment": "No uncertainty intervals, trial accounting or multiple-testing safeguards."
+      },
+      {
+        "part": 6,
+        "title": "PART 6 \u2014 TIME SERIES BASICS",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 444
+        },
+        "status": "partial",
+        "assessment": "Rolling returns and volatility exist; no stationarity or autocorrelation research."
+      },
+      {
+        "part": 7,
+        "title": "PART 7 \u2014 FEATURES AND INDICATORS",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 487
+        },
+        "status": "partial",
+        "assessment": "Returns/SMA/z-score/RSI/Bollinger/ranks/volatility implemented; no EMA, ATR, MACD, stochastic, VWAP or derived volume features."
+      },
+      {
+        "part": 8,
+        "title": "PART 8 \u2014 SIGNAL GENERATION",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 539
+        },
+        "status": "partial",
+        "assessment": "Several threshold baselines exist; no shared signed strategy interface for live use."
+      },
+      {
+        "part": 9,
+        "title": "PART 9 \u2014 POSITION SIZING",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 597
+        },
+        "status": "defective",
+        "assessment": "Per-asset confidence/volatility sizing exists; capital fraction sent as asset quantity."
+      },
+      {
+        "part": 10,
+        "title": "PART 10 \u2014 LONG/SHORT STRATEGIES",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 639
+        },
+        "status": "defective",
+        "assessment": "Backtest supports negative weights and short API wrappers exist; live cannot sell, short or close positions."
+      },
+      {
+        "part": 11,
+        "title": "PART 11 \u2014 BACKTESTING",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 665
+        },
+        "status": "defective",
+        "assessment": "Vectorized single-asset simulator exists; fee/drawdown defects, no fill ledger or reconciled cash/portfolio accounting."
+      },
+      {
+        "part": 12,
+        "title": "PART 12 \u2014 HOW TO ACCIDENTALLY FAKE A PROFITABLE STRATEGY",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 737
+        },
+        "status": "defective",
+        "assessment": "Features pass prefix invariance on fixtures, but leakage guard is vacuous and forward labels cross validation boundaries."
+      },
+      {
+        "part": 13,
+        "title": "PART 13 \u2014 TRAINING / VALIDATION / TESTING",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 811
+        },
+        "status": "defective",
+        "assessment": "Chronological rolling splits exist; no horizon purge or separately locked final test period."
+      },
+      {
+        "part": 14,
+        "title": "PART 14 \u2014 OVERFITTING",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 846
+        },
+        "status": "partial",
+        "assessment": "Train-validation accuracy gap recorded; no parameter stability or held-out evidence."
+      },
+      {
+        "part": 15,
+        "title": "PART 15 \u2014 ROBUSTNESS TESTING",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 880
+        },
+        "status": "missing",
+        "assessment": "No parameter, cost, asset, period, delay or outage robustness research harness."
+      },
+      {
+        "part": 16,
+        "title": "PART 16 \u2014 PERFORMANCE METRICS",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 924
+        },
+        "status": "defective",
+        "assessment": "Basic metrics exist but drawdown/terminal fees/Sortino edge cases fail; win rate is per bar, not per closed trade."
+      },
+      {
+        "part": 17,
+        "title": "PART 17 \u2014 TRANSACTION COSTS AND EXECUTION",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 980
+        },
+        "status": "defective",
+        "assessment": "Fixed fee/slippage assumptions and turnover charges exist; probability edge proxy invalid, no dynamic spread or realized fill costs."
+      },
+      {
+        "part": 18,
+        "title": "PART 18 \u2014 MARKET MICROSTRUCTURE",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1010
+        },
+        "status": "partial",
+        "assessment": "Bid/ask collected but not used for fills, spread gates or execution timing."
+      },
+      {
+        "part": 19,
+        "title": "PART 19 \u2014 RISK MANAGEMENT",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1036
+        },
+        "status": "defective",
+        "assessment": "Per-asset sizing active; portfolio cap, drawdown kill switch and hourly order limit not enforced in live loop. No daily loss/correlation caps."
+      },
+      {
+        "part": 20,
+        "title": "PART 20 \u2014 PORTFOLIO CONSTRUCTION",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1084
+        },
+        "status": "defective",
+        "assessment": "Positive allocation cap helper exists; signed gross limit wrong and helper not integrated. No correlated cluster controls or portfolio backtest."
+      },
+      {
+        "part": 21,
+        "title": "PART 21 \u2014 STRATEGY IDEAS FOR A BEGINNER",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1112
+        },
+        "status": "partial",
+        "assessment": "Three explicit strategy baselines, several feature families, three missing/raw-only families; no validation evidence supplied."
+      },
+      {
+        "part": 22,
+        "title": "PART 22 \u2014 COMBINING STRATEGIES",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1211
+        },
+        "status": "partial",
+        "assessment": "Rule averaging and ML combinations exist; ablation confounds model change with regime contribution, component flags incompletely wired."
+      },
+      {
+        "part": 23,
+        "title": "PART 23 \u2014 MACHINE LEARNING",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1234
+        },
+        "status": "defective",
+        "assessment": "Three classifiers implemented; no scaler/calibration/schema artifact, horizon purge or known-label masking for classifiers. Regression target has no regressor."
+      },
+      {
+        "part": 24,
+        "title": "PART 24 \u2014 REINFORCEMENT LEARNING",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1278
+        },
+        "status": "optional_not_implemented",
+        "assessment": "Reinforcement learning absent; handbook describes it as generally unnecessary for this beginner setting."
+      },
+      {
+        "part": 25,
+        "title": "PART 25 \u2014 BOT ARCHITECTURE",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1295
+        },
+        "status": "defective",
+        "assessment": "Modules separated; no trained-model loading, authoritative portfolio state, order delta or fill reconciliation. Service package path invalid in documented checkout."
+      },
+      {
+        "part": 26,
+        "title": "PART 26 \u2014 LIVE TRADING VS BACKTESTING",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1355
+        },
+        "status": "defective",
+        "assessment": "Retry/logging/service restart exist; ambiguous order POSTs retried blindly, no centralized limiter, stale-data halt or partial-fill reconciliation."
+      },
+      {
+        "part": 27,
+        "title": "PART 27 \u2014 PAPER TRADING / DRY RUN",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1377
+        },
+        "status": "shadow_logging_only",
+        "assessment": "DRY_RUN suppresses orders; no paper cash/positions/fills/P&L or demonstrated live-backtest parity."
+      },
+      {
+        "part": 28,
+        "title": "PART 28 \u2014 LOGGING AND DEBUGGING",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1396
+        },
+        "status": "partial",
+        "assessment": "Console signal/API error logging present; no structured position/fill/fee/P&L event ledger."
+      },
+      {
+        "part": 29,
+        "title": "PART 29 \u2014 SOFTWARE ENGINEERING PRACTICES",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1436
+        },
+        "status": "partial",
+        "assessment": "Config/modules/gitignore/seed present; no supplied offline tests, package metadata or saved data/model manifests. This audit adds checks only."
+      },
+      {
+        "part": 30,
+        "title": "PART 30 \u2014 EXPERIMENTATION WORKFLOW",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1492
+        },
+        "status": "partial",
+        "assessment": "Baseline comparison scaffold exists; no experiment records, fair common out-of-sample window or final holdout evidence."
+      },
+      {
+        "part": 31,
+        "title": "PART 31 \u2014 HOW TO CONDUCT A GOOD TRADING EXPERIMENT",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1558
+        },
+        "status": "missing_research_evidence",
+        "assessment": "No frozen hypothesis/data/config/cost records or rejected-experiment log."
+      },
+      {
+        "part": 32,
+        "title": "PART 32 \u2014 20 THINGS THAT WILL PROBABLY GO WRONG IN YOUR FIRST TRADING BOT",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1584
+        },
+        "status": "defective",
+        "assessment": "Several listed first-bot pitfalls reproduced by this audit; see individual contract results."
+      },
+      {
+        "part": 33,
+        "title": "PART 33 \u2014 HACKATHON STRATEGY",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1629
+        },
+        "status": "not_code_requirement",
+        "assessment": "Team responsibilities, staged research and fallback operation are process choices; deployment instructions alone do not demonstrate readiness."
+      },
+      {
+        "part": 34,
+        "title": "PART 34 \u2014 FINAL CHEAT SHEET",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1681
+        },
+        "status": "partial",
+        "assessment": "Some essential formulas implemented; final trust questions remain unresolved without repaired accounting and out-of-sample/robustness evidence."
+      }
+    ],
+    "parameters": [
+      {
+        "parameter": "BASE_URL",
+        "value": "https://mock-api.roostoo.com",
+        "source": {
+          "path": "config.py",
+          "line": 19
+        },
+        "references": [
+          {
+            "path": "execution/trader.py",
+            "line": 20
+          },
+          {
+            "path": "execution/trader.py",
+            "line": 43
+          },
+          {
+            "path": "execution/trader.py",
+            "line": 49
+          }
+        ],
+        "assessment": "Referenced by the draft; effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "UNIVERSE_GROUPS",
+        "value": {
+          "majors": [
+            "BTC/USD",
+            "ETH/USD",
+            "SOL/USD",
+            "BNB/USD",
+            "XRP/USD",
+            "ADA/USD",
+            "DOGE/USD",
+            "LINK/USD",
+            "AVAX/USD",
+            "DOT/USD",
+            "LTC/USD",
+            "TRX/USD",
+            "TON/USD",
+            "SUI/USD",
+            "APT/USD",
+            "NEAR/USD",
+            "ICP/USD",
+            "HBAR/USD",
+            "FIL/USD",
+            "XLM/USD"
+          ],
+          "defi_midcap": [
+            "UNI/USD",
+            "AAVE/USD",
+            "CRV/USD",
+            "PENDLE/USD",
+            "CAKE/USD",
+            "ONDO/USD",
+            "ENA/USD",
+            "ARB/USD",
+            "POL/USD",
+            "SEI/USD",
+            "CFX/USD"
+          ],
+          "tokenized_equities": [
+            "NVDAB/USD",
+            "TSLAB/USD",
+            "GOOGLB/USD",
+            "MSFTB/USD",
+            "AMDB/USD",
+            "QCOMB/USD",
+            "INTCB/USD",
+            "SNDKB/USD",
+            "CRCLB/USD",
+            "MSTRB/USD",
+            "SPCXB/USD",
+            "LITEB/USD",
+            "COINB/USD",
+            "SKHYB/USD",
+            "CBRSB/USD"
+          ],
+          "meme_high_vol": [
+            "PEPE/USD",
+            "SHIB/USD",
+            "BONK/USD",
+            "WIF/USD",
+            "FLOKI/USD",
+            "1000CHEEMS/USD",
+            "TRUMP/USD",
+            "PENGU/USD"
+          ],
+          "unverified": [
+            "EDEN/USD",
+            "MIRA/USD",
+            "STO/USD",
+            "OMNI/USD",
+            "OPEN/USD",
+            "HEMI/USD",
+            "TUT/USD",
+            "BMT/USD",
+            "BIO/USD",
+            "GLWB/USD",
+            "WDCB/USD",
+            "AVNT/USD",
+            "XPL/USD",
+            "LISTA/USD",
+            "VIRTUAL/USD",
+            "SOMI/USD",
+            "FORM/USD",
+            "LINEA/USD",
+            "EIGEN/USD",
+            "PLUME/USD",
+            "NBISB/USD",
+            "METAB/USD",
+            "WLFI/USD",
+            "ASTER/USD",
+            "ZEN/USD",
+            "MUB/USD",
+            "WLD/USD",
+            "ZEC/USD"
+          ]
+        },
+        "source": {
+          "path": "config.py",
+          "line": 35
+        },
+        "references": [],
+        "assessment": "Grouping catalog only; cross-sectional routine does not enforce groups if universe is expanded."
+      },
+      {
+        "parameter": "UNIVERSE",
+        "value": [
+          "BTC/USD",
+          "ETH/USD",
+          "SOL/USD",
+          "BNB/USD",
+          "XRP/USD",
+          "ADA/USD",
+          "DOGE/USD",
+          "LINK/USD",
+          "AVAX/USD",
+          "DOT/USD",
+          "LTC/USD",
+          "TRX/USD",
+          "TON/USD",
+          "SUI/USD",
+          "APT/USD",
+          "NEAR/USD",
+          "ICP/USD",
+          "HBAR/USD",
+          "FIL/USD",
+          "XLM/USD"
+        ],
+        "source": {
+          "path": "config.py",
+          "line": 68
+        },
+        "references": [
+          {
+            "path": "data/collector.py",
+            "line": 24
+          },
+          {
+            "path": "data/collector.py",
+            "line": 40
+          },
+          {
+            "path": "main.py",
+            "line": 28
+          },
+          {
+            "path": "main.py",
+            "line": 25
+          }
+        ],
+        "assessment": "Referenced by the draft; effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "MARKET_PROXY",
+        "value": "BTC/USD",
+        "source": {
+          "path": "config.py",
+          "line": 69
+        },
+        "references": [
+          {
+            "path": "features/build_features.py",
+            "line": 43
+          },
+          {
+            "path": "features/build_features.py",
+            "line": 43
+          },
+          {
+            "path": "features/build_features.py",
+            "line": 45
+          },
+          {
+            "path": "features/cross_sectional.py",
+            "line": 25
+          },
+          {
+            "path": "features/cross_sectional.py",
+            "line": 25
+          }
+        ],
+        "assessment": "Referenced by the draft; effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "POLL_INTERVAL_SECONDS",
+        "value": 60,
+        "source": {
+          "path": "config.py",
+          "line": 75
+        },
+        "references": [
+          {
+            "path": "data/collector.py",
+            "line": 39
+          },
+          {
+            "path": "main.py",
+            "line": 59
+          }
+        ],
+        "assessment": "Referenced by the draft; effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "STORE_DIR",
+        "value": "data_store",
+        "source": {
+          "path": "config.py",
+          "line": 76
+        },
+        "references": [
+          {
+            "path": "data/store.py",
+            "line": 11
+          },
+          {
+            "path": "data/store.py",
+            "line": 16
+          }
+        ],
+        "assessment": "Referenced by the draft; effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "INITIAL_CAPITAL",
+        "value": 100000.0,
+        "source": {
+          "path": "config.py",
+          "line": 79
+        },
+        "references": [],
+        "assessment": "Declared but not used in bot accounting or live quantity sizing."
+      },
+      {
+        "parameter": "COMPETITION_DURATION_DAYS",
+        "value": 14,
+        "source": {
+          "path": "config.py",
+          "line": 80
+        },
+        "references": [],
+        "assessment": "Declared only; no duration-driven shutdown or evaluation window."
+      },
+      {
+        "parameter": "NO_LEVERAGE",
+        "value": true,
+        "source": {
+          "path": "config.py",
+          "line": 81
+        },
+        "references": [],
+        "assessment": "Declarative flag; not an enforced live risk constraint."
+      },
+      {
+        "parameter": "NO_HFT",
+        "value": true,
+        "source": {
+          "path": "config.py",
+          "line": 82
+        },
+        "references": [],
+        "assessment": "Declarative flag; slow polling is configured separately."
+      },
+      {
+        "parameter": "BARS_PER_YEAR",
+        "value": 525600,
+        "source": {
+          "path": "config.py",
+          "line": 86
+        },
+        "references": [
+          {
+            "path": "backtest/engine.py",
+            "line": 68
+          }
+        ],
+        "assessment": "Assumes regular 60-second bars; polling includes processing time and missing ticks are not repaired."
+      },
+      {
+        "parameter": "MOMENTUM_HORIZONS",
+        "value": [
+          1,
+          5,
+          10,
+          20,
+          30
+        ],
+        "source": {
+          "path": "config.py",
+          "line": 89
+        },
+        "references": [
+          {
+            "path": "features/momentum.py",
+            "line": 17
+          },
+          {
+            "path": "features/momentum.py",
+            "line": 37
+          },
+          {
+            "path": "main.py",
+            "line": 30
+          }
+        ],
+        "assessment": "Referenced by the draft; effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "MA_WINDOWS",
+        "value": {
+          "fast": 5,
+          "slow": 20
+        },
+        "source": {
+          "path": "config.py",
+          "line": 90
+        },
+        "references": [
+          {
+            "path": "features/momentum.py",
+            "line": 21
+          },
+          {
+            "path": "features/momentum.py",
+            "line": 22
+          }
+        ],
+        "assessment": "Referenced by the draft; effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "MEAN_REV_WINDOW",
+        "value": 20,
+        "source": {
+          "path": "config.py",
+          "line": 91
+        },
+        "references": [
+          {
+            "path": "features/mean_reversion.py",
+            "line": 29
+          },
+          {
+            "path": "main.py",
+            "line": 30
+          }
+        ],
+        "assessment": "Referenced by the draft; effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "BOLLINGER_WINDOW",
+        "value": 20,
+        "source": {
+          "path": "config.py",
+          "line": 92
+        },
+        "references": [
+          {
+            "path": "features/mean_reversion.py",
+            "line": 46
+          }
+        ],
+        "assessment": "Referenced by the draft; effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "BOLLINGER_STD",
+        "value": 2,
+        "source": {
+          "path": "config.py",
+          "line": 93
+        },
+        "references": [
+          {
+            "path": "features/mean_reversion.py",
+            "line": 47
+          }
+        ],
+        "assessment": "Referenced by the draft; effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "REGIME_VOL_WINDOW",
+        "value": 30,
+        "source": {
+          "path": "config.py",
+          "line": 94
+        },
+        "references": [
+          {
+            "path": "features/regime.py",
+            "line": 17
+          },
+          {
+            "path": "main.py",
+            "line": 30
+          }
+        ],
+        "assessment": "Referenced by the draft; effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "REGIME_TREND_WINDOW",
+        "value": 30,
+        "source": {
+          "path": "config.py",
+          "line": 95
+        },
+        "references": [
+          {
+            "path": "features/regime.py",
+            "line": 18
+          }
+        ],
+        "assessment": "Referenced by the draft; effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "TARGET_HORIZON",
+        "value": 10,
+        "source": {
+          "path": "config.py",
+          "line": 98
+        },
+        "references": [
+          {
+            "path": "model/targets.py",
+            "line": 11
+          },
+          {
+            "path": "model/targets.py",
+            "line": 17
+          },
+          {
+            "path": "model/targets.py",
+            "line": 27
+          }
+        ],
+        "assessment": "Used in labels; no split purge or matching live holding/exit horizon."
+      },
+      {
+        "parameter": "TARGET_MODE",
+        "value": "threshold",
+        "source": {
+          "path": "config.py",
+          "line": 100
+        },
+        "references": [
+          {
+            "path": "model/targets.py",
+            "line": 27
+          }
+        ],
+        "assessment": "Threshold/direction classifiers provided; advertised regression mode lacks a regressor."
+      },
+      {
+        "parameter": "TAKER_FEE",
+        "value": 0.001,
+        "source": {
+          "path": "config.py",
+          "line": 103
+        },
+        "references": [
+          {
+            "path": "costs.py",
+            "line": 12
+          }
+        ],
+        "assessment": "Used in costs; venue fee assumption has not been freshly verified."
+      },
+      {
+        "parameter": "MAKER_FEE",
+        "value": 0.0005,
+        "source": {
+          "path": "config.py",
+          "line": 104
+        },
+        "references": [
+          {
+            "path": "costs.py",
+            "line": 12
+          }
+        ],
+        "assessment": "Cost helper supports maker setting; live order call uses MARKET, no resting/fill behavior tested."
+      },
+      {
+        "parameter": "ROUND_TRIP_COST_ESTIMATE",
+        "value": 0.002,
+        "source": {
+          "path": "config.py",
+          "line": 105
+        },
+        "references": [],
+        "assessment": "Configuration/catalog value; see dependent settings, not an independent live guard."
+      },
+      {
+        "parameter": "SLIPPAGE_ESTIMATE",
+        "value": 0.0003,
+        "source": {
+          "path": "config.py",
+          "line": 106
+        },
+        "references": [
+          {
+            "path": "costs.py",
+            "line": 13
+          }
+        ],
+        "assessment": "Fixed round-trip placeholder; no measured fills or spread model."
+      },
+      {
+        "parameter": "SAFETY_MARGIN",
+        "value": 0.0003,
+        "source": {
+          "path": "config.py",
+          "line": 107
+        },
+        "references": [
+          {
+            "path": "costs.py",
+            "line": 17
+          }
+        ],
+        "assessment": "Referenced by the draft; effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "TARGET_THRESHOLD",
+        "value": 0.0026,
+        "source": {
+          "path": "config.py",
+          "line": 108
+        },
+        "references": [
+          {
+            "path": "model/targets.py",
+            "line": 22
+          }
+        ],
+        "assessment": "Referenced by the draft; effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "MAX_POSITION_PER_ASSET",
+        "value": 0.2,
+        "source": {
+          "path": "config.py",
+          "line": 117
+        },
+        "references": [
+          {
+            "path": "backtest/ablation.py",
+            "line": 20
+          },
+          {
+            "path": "backtest/ablation.py",
+            "line": 15
+          },
+          {
+            "path": "backtest/ablation.py",
+            "line": 85
+          },
+          {
+            "path": "backtest/ablation.py",
+            "line": 97
+          },
+          {
+            "path": "backtest/ablation.py",
+            "line": 22
+          },
+          {
+            "path": "backtest/ablation.py",
+            "line": 86
+          },
+          {
+            "path": "backtest/ablation.py",
+            "line": 98
+          },
+          {
+            "path": "backtest/ablation.py",
+            "line": 56
+          },
+          {
+            "path": "sizing.py",
+            "line": 15
+          }
+        ],
+        "assessment": "Referenced by the draft; effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "MAX_PORTFOLIO_EXPOSURE",
+        "value": 0.7,
+        "source": {
+          "path": "config.py",
+          "line": 118
+        },
+        "references": [
+          {
+            "path": "sizing.py",
+            "line": 41
+          }
+        ],
+        "assessment": "Helper default only; live loop does not call it; signed gross calculation defective."
+      },
+      {
+        "parameter": "MAX_TRADES_PER_HOUR",
+        "value": 20,
+        "source": {
+          "path": "config.py",
+          "line": 119
+        },
+        "references": [],
+        "assessment": "Declared only; live order-rate check absent."
+      },
+      {
+        "parameter": "MAX_DRAWDOWN_KILL_SWITCH",
+        "value": 0.12,
+        "source": {
+          "path": "config.py",
+          "line": 120
+        },
+        "references": [],
+        "assessment": "Declared only; live equity/drawdown state and stop logic absent."
+      },
+      {
+        "parameter": "MIN_CONFIDENCE_TO_TRADE",
+        "value": 0.55,
+        "source": {
+          "path": "config.py",
+          "line": 121
+        },
+        "references": [
+          {
+            "path": "sizing.py",
+            "line": 14
+          }
+        ],
+        "assessment": "Referenced by the draft; effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "COMPONENTS",
+        "value": {
+          "momentum": true,
+          "mean_reversion": true,
+          "cross_sectional": true,
+          "regime": true,
+          "ml_model": true,
+          "cost_filter": true,
+          "position_sizing": true
+        },
+        "source": {
+          "path": "config.py",
+          "line": 124
+        },
+        "references": [
+          {
+            "path": "features/build_features.py",
+            "line": 32
+          }
+        ],
+        "assessment": "Feature switches respected; ml_model, cost_filter, position_sizing switches ignored by live loop and ablation stages."
+      },
+      {
+        "parameter": "WALKFORWARD_TRAIN_BARS",
+        "value": 2000,
+        "source": {
+          "path": "config.py",
+          "line": 135
+        },
+        "references": [
+          {
+            "path": "model/train.py",
+            "line": 24
+          }
+        ],
+        "assessment": "Used by offline trainer; not connected to autonomous retraining/model loading."
+      },
+      {
+        "parameter": "WALKFORWARD_VAL_BARS",
+        "value": 500,
+        "source": {
+          "path": "config.py",
+          "line": 136
+        },
+        "references": [
+          {
+            "path": "model/train.py",
+            "line": 25
+          }
+        ],
+        "assessment": "Used by offline trainer; classification accuracy alone is not economic performance."
+      },
+      {
+        "parameter": "WALKFORWARD_STEP_BARS",
+        "value": 500,
+        "source": {
+          "path": "config.py",
+          "line": 137
+        },
+        "references": [
+          {
+            "path": "model/train.py",
+            "line": 26
+          }
+        ],
+        "assessment": "Used by offline trainer; no purge/final holdout."
+      },
+      {
+        "parameter": "RANDOM_SEED",
+        "value": 42,
+        "source": {
+          "path": "config.py",
+          "line": 139
+        },
+        "references": [
+          {
+            "path": "model/train.py",
+            "line": 16
+          },
+          {
+            "path": "model/train.py",
+            "line": 18
+          }
+        ],
+        "assessment": "Referenced by the draft; effectiveness and tuning remain unvalidated."
+      }
+    ],
+    "hardcoded_strategy_parameters": [
+      {
+        "parameter": "cross-sectional return horizon",
+        "value": 5,
+        "file": "features/cross_sectional.py"
+      },
+      {
+        "parameter": "momentum baseline threshold",
+        "value": 0.0,
+        "file": "backtest/ablation.py"
+      },
+      {
+        "parameter": "mean-reversion baseline z threshold",
+        "value": 1.5,
+        "file": "backtest/ablation.py"
+      },
+      {
+        "parameter": "cross-sectional long/short percentiles",
+        "value": [
+          0.7,
+          0.3
+        ],
+        "file": "backtest/ablation.py"
+      },
+      {
+        "parameter": "reference volatility for sizing",
+        "value": 0.01,
+        "file": "sizing.py"
+      }
+    ],
+    "priorities": [
+      "Fix unknown-label masking and horizon purge; freeze chronological train/validation/final-test datasets.",
+      "Repair terminal fees and initial-equity drawdown; define finite metric edge cases and reconcile scoring conventions with organizer sources.",
+      "Define shared strategy target positions and explicit exit/short semantics; convert target capital to venue-legal quantity and submit only position deltas.",
+      "Integrate gross portfolio, hourly order and drawdown constraints with authoritative portfolio state.",
+      "Freeze training/inference feature schema; replace probability-minus-0.5 with train-only calibrated payoff expectation or a validated return model.",
+      "Make ablations change one component at a time on identical out-of-sample timestamps; compare at comparable exposure and realistic costs.",
+      "Run historical multi-regime, multi-asset parameter/cost/delay stress tests and paper accounting before deciding which 2\u20134 strategy families to retain."
+    ],
+    "unverified": [
+      "Historical profitability: no market dataset, saved trained model or backtest results committed.",
+      "Venue fees, minimum order sizes, symbols, short mechanics, rate limits and exact competition scoring conventions.",
+      "Whether the deployed environment uses a different package layout or an external model-loading/reconciliation layer."
+    ]
+  }
+}

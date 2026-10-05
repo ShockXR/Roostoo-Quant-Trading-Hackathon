@@ -1,82 +1,27 @@
+"""Read-only order-size inspection. This command never places orders.
+
+Roostoo's official ExchangeInfo documents MiniOrder as notional value:
+OrderPrice * OrderAmount > MiniOrder. AmountPrecision controls quantity
+rounding. Inspect the current account's public metadata before deployment.
 """
-Determines whether "Minimum order size: 1" means $1 notional (price * qty)
-or 1 whole unit of the coin, by reading ExchangeInfo and attempting a few
-deliberately tiny orders and reading back the exact ErrMsg.
-
-Run with real API_KEY/SECRET set (env vars RST_API_KEY / RST_API_SECRET,
-or edit config.py directly), from the project root:
-
-    python -m roostoo_bot.scripts.test_min_order
-
-Safe to run against the mock exchange -- it's not real money, and every
-attempt is logged with the raw response so you can see exactly what the
-server says either way.
-"""
-import sys
-
-from .. import config
-from ..execution.trader import get_exchange_info, get_ticker, place_order, cancel_order
-
-# Pick one cheap, high-unit-price coin and one expensive, low-unit-price
-# coin -- if the rule were "1 whole unit", these two would behave very
-# differently; if it's "$1 notional", both should behave the same way.
-TEST_PAIRS = ["DOGE/USD", "BTC/USD"]
+import argparse
+from ..execution.trader import get_exchange_info, get_ticker
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--pair", default="BTC/USD")
+    args = parser.parse_args()
     info = get_exchange_info()
-    if not info or not info.get("IsRunning", True):
-        print("Could not reach exchange info, aborting.")
-        sys.exit(1)
-
-    pairs_info = info.get("TradePairs", {})
-
-    for pair in TEST_PAIRS:
-        meta = pairs_info.get(pair)
-        if not meta:
-            print(f"{pair}: not found in ExchangeInfo, skipping")
-            continue
-
-        mini_order = meta["MiniOrder"]
-        amount_precision = meta["AmountPrecision"]
-        print(f"\n=== {pair} ===")
-        print(f"MiniOrder={mini_order}  AmountPrecision={amount_precision}")
-
-        ticker = get_ticker(pair)
-        if not ticker or not ticker.get("Success"):
-            print(f"  could not fetch ticker for {pair}, skipping")
-            continue
-        last_price = ticker["Data"][pair]["LastPrice"]
-        print(f"  LastPrice={last_price}")
-
-        # Attempt 1: quantity = 1 whole unit (tests the "1 unit" theory)
-        print("  -> attempting quantity=1 (whole unit)...")
-        resp1 = place_order(pair, "BUY", quantity=1)
-        print(f"     response: {resp1}")
-        if resp1 and resp1.get("Success"):
-            order_id = resp1["OrderDetail"]["OrderID"]
-            cancel_order(order_id=order_id)  # clean up if it rested as a limit/pending order
-
-        # Attempt 2: quantity sized so that price * qty ~= $0.50 (tests the
-        # "$1 notional" theory -- this SHOULD fail if $1 notional is the rule,
-        # and the ErrMsg wording will confirm which rule is actually enforced)
-        tiny_qty = round(0.5 / last_price, amount_precision)
-        if tiny_qty <= 0:
-            tiny_qty = 10 ** (-amount_precision)
-        print(f"  -> attempting quantity={tiny_qty} (~$0.50 notional)...")
-        resp2 = place_order(pair, "BUY", quantity=tiny_qty)
-        print(f"     response: {resp2}")
-        if resp2 and resp2.get("Success"):
-            order_id = resp2["OrderDetail"]["OrderID"]
-            cancel_order(order_id=order_id)
-
-    print(
-        "\nRead the ErrMsg text above closely. A message like "
-        "'quantity below minimum' or mentioning AmountPrecision/qty points to "
-        "a UNIT minimum. A message mentioning order VALUE or notional, or "
-        "attempt 2 succeeding while being well under 1 whole unit, confirms "
-        "a $ NOTIONAL minimum."
-    )
+    ticker = get_ticker(args.pair)
+    if not info or not info.get("IsRunning") or not ticker or not ticker.get("Success"):
+        parser.error("exchange metadata/ticker unavailable")
+    meta = info["TradePairs"].get(args.pair)
+    if not meta:
+        parser.error("pair not listed")
+    price = float(ticker["Data"][args.pair]["MinAsk"])
+    print(f"{args.pair}: AmountPrecision={meta['AmountPrecision']}; notional must exceed ${meta['MiniOrder']}; current ask=${price}")
+    print("No orders submitted. Short opens have a separate minimum collateral requirement.")
 
 
 if __name__ == "__main__":

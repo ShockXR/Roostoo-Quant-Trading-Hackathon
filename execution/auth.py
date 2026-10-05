@@ -13,7 +13,7 @@ def get_timestamp() -> str:
     return str(int(time.time() * 1000))
 
 
-def sign(payload: dict, secret: str = config.SECRET) -> tuple[dict, dict, str]:
+def sign(payload: dict, secret: str | None = None) -> tuple[dict, dict, str]:
     """
     Adds a timestamp to payload, builds the sorted query/body string,
     and returns (headers, payload, total_params_string).
@@ -23,6 +23,7 @@ def sign(payload: dict, secret: str = config.SECRET) -> tuple[dict, dict, str]:
     mismatch what the server computes.
     """
     payload = dict(payload)  # don't mutate caller's dict
+    secret = config.SECRET if secret is None else secret
     payload["timestamp"] = get_timestamp()
 
     sorted_keys = sorted(payload.keys())

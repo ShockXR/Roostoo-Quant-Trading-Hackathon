@@ -21,14 +21,15 @@ def add_regime_features(df: pd.DataFrame, price_col: str = "last_price") -> pd.D
 
     # realized volatility and whether it's expanding or contracting
     df["realized_vol"] = rets.rolling(vol_w).std()
-    df["vol_change"] = df["realized_vol"].pct_change(vol_w)
+    previous_vol = df["realized_vol"].shift(vol_w)
+    df["vol_change"] = (df["realized_vol"] / previous_vol.replace(0, np.nan) - 1).mask((previous_vol == 0) & (df["realized_vol"] == 0), 0.)
 
     # simple trend-strength proxy: |net move| relative to the sum of
     # absolute step-to-step moves over the window. Close to 1 = smooth
     # persistent trend, close to 0 = choppy/sideways.
     net_move = df[price_col].diff(trend_w).abs()
     path_length = rets.abs().rolling(trend_w).sum() * df[price_col].shift(trend_w)
-    df["trend_strength"] = (net_move / path_length.replace(0, np.nan)).clip(0, 1)
+    df["trend_strength"] = (net_move / path_length.replace(0, np.nan)).clip(0, 1).mask(path_length == 0, 0.)
 
     return df
 

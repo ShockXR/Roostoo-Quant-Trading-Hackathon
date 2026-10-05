@@ -1,0 +1,3034 @@
+{
+  "generated_utc": "2026-10-05T00:53:53.223817+00:00",
+  "base_commit": "3aa87f58a1349e85f4300ae588f9e420b7c8107c",
+  "working_tree_changes_tested": true,
+  "scope": "Offline deterministic regression fixtures, synthetic paper ledgers and mocked API responses. No actual orders, historical profitability or organizer metric parity verified.",
+  "python": "3.12.14",
+  "dependencies": {
+    "numpy": "2.3.5",
+    "pandas": "2.2.3",
+    "scikit-learn": "1.9.1",
+    "requests": "2.34.2",
+    "pyarrow": "25.0.1"
+  },
+  "handbook_sha256": "4ffdf7b49de946fb75f13b6d9ca4fad415e8de3ea1b340dad52c8c6966c69478",
+  "source_hashes": {
+    "__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "analysis/audit_bot.py": "125e226886ab133bdd0a9bb1394e88d80f2559cb932875adb5df92c3409878e2",
+    "analysis/coverage.py": "b2a67997c67e09121dfa0217d103c6b95becf73f53cc2a5fda0b617ef522b4ba",
+    "backtest/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "backtest/ablation.py": "a0ee6f7feb48609cd06c7e4a8a4cba90c37709c7e03f12a513c8d300376195c7",
+    "backtest/engine.py": "f7ebccc141fc44d4673ca9ad4d3105f05bacb902e167294b74cbf1743a146d51",
+    "binance_downloader.py": "eb01e6e3e5f845003139f396f67a561b2344ba17c366d103e5cd1cf3e0a31128",
+    "config.py": "9484351e7c5786c0be9f4b869ab26e7c896fc933d5795443bf3d272f21a76124",
+    "costs.py": "f8df991ea7b2636caab25174ba231553887d0a73f98ab42b75cfcf77136d4e64",
+    "data/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "data/collector.py": "8313d913dd6aa60b41b815a9cf118acbd4bf80a2bc9601d30b1b5552a918676c",
+    "data/store.py": "32b0a9f3d17402719b4a793efac73cf38fe98e7e2ae2866d9275e24dff702412",
+    "data/validation.py": "b3b971e3cca1d0b5299a9c480d705163d37e87aa89431acd1e352809f2fdb15c",
+    "execution/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "execution/auth.py": "e3f9d1cd382e6a56ce93da536005bc0a875068c0db8495796ccb8ff29a53fe83",
+    "execution/broker.py": "0bf52d668348f3386aa626f1f5822dc2a85f9c6e3e7962df359f38525924d8a0",
+    "execution/portfolio.py": "25e77d77a19fa26a6ab731d8f1fa64bdce6d68b2f845faade9c1d67e1f831b14",
+    "execution/trader.py": "465be617413176f6ad39b568f9945fae399fbc1428833c17793fdbad98b56f1e",
+    "features/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "features/build_features.py": "ca747511fe2ee9b8e327ec6a02b4ae76493071ad9afe136d26f4ac705d030cf6",
+    "features/cross_sectional.py": "51c5da70b82ab8f4515a77f26e6b488f96b75a512b5a9b6e5f6319baeed8cc1c",
+    "features/mean_reversion.py": "7931f9531097367f1fecbed8b80c9cb6aa549e56b212b051f5b010463117a873",
+    "features/momentum.py": "e0a69bb33324ecd548823e91bf1ce63e5285e13f059c5d94b3a6624033c71db1",
+    "features/regime.py": "d4cc8def51dd40f85d9de084b630bb29807a2fea5f3ddec8a2ddf0923bcf2d08",
+    "main.py": "d83d33eddb91b952c9d218b9d34125050961c2e389842490da8873667eef4f09",
+    "model/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "model/artifact.py": "b8675db4000baa2e7ce195524079ca366458d7b8862c1808a8982299997748e7",
+    "model/targets.py": "dec73b6fd107a2c362d3a2dc1d07dedec2352676c2962e12a27451cd1663f293",
+    "model/train.py": "032f36ddccf515eb7e38e22d36c099c817057bc4bd141e892c4cb86eb43e00ec",
+    "scripts/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "scripts/backtest_sol.py": "792a35493597a79ab286158d682a67a414b76ec5aa16b0c4a3708aa8a2010f42",
+    "scripts/sweep.py": "8d35a30c5a74472963f8b706d995151ae1fa18f642b93c58588ebc4ecca3bed4",
+    "scripts/test_min_order.py": "3437b4ab1c19faf5b09710b5b6fc08e247f0e20252668dded453df4841439cd4",
+    "sizing.py": "bb19b591d0a03530cf5a4b02771fcb276c8dcf3bb9ba1ca0ebd5a16629a8b170",
+    "strategy.py": "5c3af3e625a48b901f63e2f2be7bb2056579335e5fbb5b78d0107524b1f5d3da",
+    "tests/__init__.py": "2ff48478b3affe00f63e54d18d4c3d7a158df4076b0e4fd558ebd25d576ace88",
+    "tests/fixtures.py": "39d8ef2b4fdf7a72dc31e4bdd22612055a0772a2aad6bd48a1f0ad2c5cce4f94",
+    "tests/test_integration.py": "d095f48f97256094656786f93eb83c6f2d45c9f23cfae05b038eab6049a37a42",
+    "tests/test_regressions.py": "1d4235db4ee28bb2cd02e3166a250bdfb4362a7d7c8870b15e441ee35bf4aa46"
+  },
+  "baseline": {
+    "path": "analysis/audit_results_baseline.json",
+    "counts": {
+      "PASS": 9,
+      "FAIL": 24
+    }
+  },
+  "live_flags": {
+    "DRY_RUN": true,
+    "LIVE_TRADING_ENABLED": false,
+    "ALLOW_SHORTS": false
+  },
+  "counts": {
+    "PASS": 76
+  },
+  "checks": [
+    {
+      "check": "tests.test_integration.IntegrationTests.test_binance_close_is_available_after_one_minute",
+      "status": "PASS",
+      "evidence": "binance close is available after one minute",
+      "source": {
+        "path": "tests/test_integration.py",
+        "line": 27
+      }
+    },
+    {
+      "check": "tests.test_integration.IntegrationTests.test_binance_duplicate_candle_is_rejected",
+      "status": "PASS",
+      "evidence": "binance duplicate candle is rejected",
+      "source": {
+        "path": "tests/test_integration.py",
+        "line": 55
+      }
+    },
+    {
+      "check": "tests.test_integration.IntegrationTests.test_binance_interior_missing_candle_is_rejected",
+      "status": "PASS",
+      "evidence": "binance interior missing candle is rejected",
+      "source": {
+        "path": "tests/test_integration.py",
+        "line": 49
+      }
+    },
+    {
+      "check": "tests.test_integration.IntegrationTests.test_binance_partial_boundary_bars_are_discarded",
+      "status": "PASS",
+      "evidence": "binance partial boundary bars are discarded",
+      "source": {
+        "path": "tests/test_integration.py",
+        "line": 43
+      }
+    },
+    {
+      "check": "tests.test_integration.IntegrationTests.test_binance_research_cli_runs_combined_pipeline_on_fixture",
+      "status": "PASS",
+      "evidence": "binance research cli runs combined pipeline on fixture",
+      "source": {
+        "path": "tests/test_integration.py",
+        "line": 93
+      }
+    },
+    {
+      "check": "tests.test_integration.IntegrationTests.test_coarse_binance_bars_use_complete_past_candles",
+      "status": "PASS",
+      "evidence": "coarse binance bars use complete past candles",
+      "source": {
+        "path": "tests/test_integration.py",
+        "line": 36
+      }
+    },
+    {
+      "check": "tests.test_integration.IntegrationTests.test_downloader_parses_millisecond_and_microsecond_archives",
+      "status": "PASS",
+      "evidence": "downloader parses millisecond and microsecond archives",
+      "source": {
+        "path": "tests/test_integration.py",
+        "line": 82
+      }
+    },
+    {
+      "check": "tests.test_integration.IntegrationTests.test_maker_research_mode_fails_before_any_download_or_trade",
+      "status": "PASS",
+      "evidence": "maker research mode fails before any download or trade",
+      "source": {
+        "path": "tests/test_integration.py",
+        "line": 109
+      }
+    },
+    {
+      "check": "tests.test_integration.IntegrationTests.test_raw_price_and_ma_levels_are_excluded_everywhere",
+      "status": "PASS",
+      "evidence": "raw price and ma levels are excluded everywhere",
+      "source": {
+        "path": "tests/test_integration.py",
+        "line": 61
+      }
+    },
+    {
+      "check": "tests.test_integration.IntegrationTests.test_single_class_folds_remain_flat_with_explicit_status",
+      "status": "PASS",
+      "evidence": "single class folds remain flat with explicit status",
+      "source": {
+        "path": "tests/test_integration.py",
+        "line": 68
+      }
+    },
+    {
+      "check": "tests.test_integration.IntegrationTests.test_sweep_collects_new_full_strategy_and_fill_metrics",
+      "status": "PASS",
+      "evidence": "sweep collects new full strategy and fill metrics",
+      "source": {
+        "path": "tests/test_integration.py",
+        "line": 115
+      }
+    },
+    {
+      "check": "tests.test_regressions.DataAndAccountingTests.test_conflicting_duplicate_raises",
+      "status": "PASS",
+      "evidence": "conflicting duplicate raises",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 245
+      }
+    },
+    {
+      "check": "tests.test_regressions.DataAndAccountingTests.test_drawdown_includes_starting_equity",
+      "status": "PASS",
+      "evidence": "drawdown includes starting equity",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 270
+      }
+    },
+    {
+      "check": "tests.test_regressions.DataAndAccountingTests.test_duplicate_ticks_are_idempotent",
+      "status": "PASS",
+      "evidence": "duplicate ticks are idempotent",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 239
+      }
+    },
+    {
+      "check": "tests.test_regressions.DataAndAccountingTests.test_gap_and_stale_history_rejected",
+      "status": "PASS",
+      "evidence": "gap and stale history rejected",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 252
+      }
+    },
+    {
+      "check": "tests.test_regressions.DataAndAccountingTests.test_last_row_liquidation_fee_included",
+      "status": "PASS",
+      "evidence": "last row liquidation fee included",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 264
+      }
+    },
+    {
+      "check": "tests.test_regressions.DataAndAccountingTests.test_metrics_do_not_mislabel_bars_as_closed_trades",
+      "status": "PASS",
+      "evidence": "metrics do not mislabel bars as closed trades",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 291
+      }
+    },
+    {
+      "check": "tests.test_regressions.DataAndAccountingTests.test_signal_cannot_earn_previous_price_move",
+      "status": "PASS",
+      "evidence": "signal cannot earn previous price move",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 275
+      }
+    },
+    {
+      "check": "tests.test_regressions.DataAndAccountingTests.test_sortino_one_loss_finite",
+      "status": "PASS",
+      "evidence": "sortino one loss finite",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 286
+      }
+    },
+    {
+      "check": "tests.test_regressions.DataAndAccountingTests.test_stale_panel_quote_expires",
+      "status": "PASS",
+      "evidence": "stale panel quote expires",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 260
+      }
+    },
+    {
+      "check": "tests.test_regressions.DataAndAccountingTests.test_zero_lag_and_missing_price_rejected",
+      "status": "PASS",
+      "evidence": "zero lag and missing price rejected",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 281
+      }
+    },
+    {
+      "check": "tests.test_regressions.ExecutionTests.test_cost_and_position_switches_respected",
+      "status": "PASS",
+      "evidence": "cost and position switches respected",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 367
+      }
+    },
+    {
+      "check": "tests.test_regressions.ExecutionTests.test_disabled_ml_no_new_risk",
+      "status": "PASS",
+      "evidence": "disabled ml no new risk",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 362
+      }
+    },
+    {
+      "check": "tests.test_regressions.ExecutionTests.test_drawdown_halt_latched_and_flattens",
+      "status": "PASS",
+      "evidence": "drawdown halt latched and flattens",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 354
+      }
+    },
+    {
+      "check": "tests.test_regressions.ExecutionTests.test_dry_run_cannot_enable_live_broker",
+      "status": "PASS",
+      "evidence": "dry run cannot enable live broker",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 426
+      }
+    },
+    {
+      "check": "tests.test_regressions.ExecutionTests.test_empty_acknowledgement_stays_uncertain",
+      "status": "PASS",
+      "evidence": "empty acknowledgement stays uncertain",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 442
+      }
+    },
+    {
+      "check": "tests.test_regressions.ExecutionTests.test_failed_poll_cannot_trade_cached_data",
+      "status": "PASS",
+      "evidence": "failed poll cannot trade cached data",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 436
+      }
+    },
+    {
+      "check": "tests.test_regressions.ExecutionTests.test_fraction_converts_to_units_and_rounds_down",
+      "status": "PASS",
+      "evidence": "fraction converts to units and rounds down",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 310
+      }
+    },
+    {
+      "check": "tests.test_regressions.ExecutionTests.test_hourly_limit_and_expiry",
+      "status": "PASS",
+      "evidence": "hourly limit and expiry",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 349
+      }
+    },
+    {
+      "check": "tests.test_regressions.ExecutionTests.test_identical_snapshot_does_not_repeat_buy",
+      "status": "PASS",
+      "evidence": "identical snapshot does not repeat buy",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 326
+      }
+    },
+    {
+      "check": "tests.test_regressions.ExecutionTests.test_insufficient_api_budget_defers_orders_without_uncertainty",
+      "status": "PASS",
+      "evidence": "insufficient api budget defers orders without uncertainty",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 449
+      }
+    },
+    {
+      "check": "tests.test_regressions.ExecutionTests.test_invalid_reconciled_holdings_rejected",
+      "status": "PASS",
+      "evidence": "invalid reconciled holdings rejected",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 460
+      }
+    },
+    {
+      "check": "tests.test_regressions.ExecutionTests.test_low_probability_exits_existing_long",
+      "status": "PASS",
+      "evidence": "low probability exits existing long",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 341
+      }
+    },
+    {
+      "check": "tests.test_regressions.ExecutionTests.test_minimum_order_filter",
+      "status": "PASS",
+      "evidence": "minimum order filter",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 430
+      }
+    },
+    {
+      "check": "tests.test_regressions.ExecutionTests.test_missing_schema_creates_no_prediction_or_order",
+      "status": "PASS",
+      "evidence": "missing schema creates no prediction or order",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 374
+      }
+    },
+    {
+      "check": "tests.test_regressions.ExecutionTests.test_paper_state_and_rate_budget_survive_restart",
+      "status": "PASS",
+      "evidence": "paper state and rate budget survive restart",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 398
+      }
+    },
+    {
+      "check": "tests.test_regressions.ExecutionTests.test_portfolio_limits_integrated_for_twenty_bullish_assets",
+      "status": "PASS",
+      "evidence": "portfolio limits integrated for twenty bullish assets",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 314
+      }
+    },
+    {
+      "check": "tests.test_regressions.ExecutionTests.test_risk_cap_overrides_small_rebalance_deadband",
+      "status": "PASS",
+      "evidence": "risk cap overrides small rebalance deadband",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 464
+      }
+    },
+    {
+      "check": "tests.test_regressions.ExecutionTests.test_shorts_use_collateral_and_close_separate_from_spot_sell",
+      "status": "PASS",
+      "evidence": "shorts use collateral and close separate from spot sell",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 407
+      }
+    },
+    {
+      "check": "tests.test_regressions.ExecutionTests.test_signed_gross_and_per_asset_limits",
+      "status": "PASS",
+      "evidence": "signed gross and per asset limits",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 300
+      }
+    },
+    {
+      "check": "tests.test_regressions.ExecutionTests.test_sizing_rejects_nonfinite_and_responds_to_volatility",
+      "status": "PASS",
+      "evidence": "sizing rejects nonfinite and responds to volatility",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 305
+      }
+    },
+    {
+      "check": "tests.test_regressions.ExecutionTests.test_small_target_drift_does_not_repeat_buy_on_next_quote",
+      "status": "PASS",
+      "evidence": "small target drift does not repeat buy on next quote",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 331
+      }
+    },
+    {
+      "check": "tests.test_regressions.ExecutionTests.test_stale_quote_blocks_cycle",
+      "status": "PASS",
+      "evidence": "stale quote blocks cycle",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 381
+      }
+    },
+    {
+      "check": "tests.test_regressions.ExecutionTests.test_uncertain_order_persists_and_blocks_retries",
+      "status": "PASS",
+      "evidence": "uncertain order persists and blocks retries",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 387
+      }
+    },
+    {
+      "check": "tests.test_regressions.ResearchTests.test_ablation_changes_one_factor_on_common_oos_dates",
+      "status": "PASS",
+      "evidence": "ablation changes one factor on common oos dates",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 185
+      }
+    },
+    {
+      "check": "tests.test_regressions.ResearchTests.test_all_feature_switches_off",
+      "status": "PASS",
+      "evidence": "all feature switches off",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 90
+      }
+    },
+    {
+      "check": "tests.test_regressions.ResearchTests.test_artifact_checksum_and_configuration_guard",
+      "status": "PASS",
+      "evidence": "artifact checksum and configuration guard",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 173
+      }
+    },
+    {
+      "check": "tests.test_regressions.ResearchTests.test_cross_sectional_ranks",
+      "status": "PASS",
+      "evidence": "cross sectional ranks",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 124
+      }
+    },
+    {
+      "check": "tests.test_regressions.ResearchTests.test_features_exclude_optional_raw_null_fields",
+      "status": "PASS",
+      "evidence": "features exclude optional raw null fields",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 83
+      }
+    },
+    {
+      "check": "tests.test_regressions.ResearchTests.test_features_invariant_to_future_shocks",
+      "status": "PASS",
+      "evidence": "features invariant to future shocks",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 71
+      }
+    },
+    {
+      "check": "tests.test_regressions.ResearchTests.test_fixed_schema_reorders_and_rejects_missing",
+      "status": "PASS",
+      "evidence": "fixed schema reorders and rejects missing",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 136
+      }
+    },
+    {
+      "check": "tests.test_regressions.ResearchTests.test_group_rank_does_not_mix_tokenized_equities",
+      "status": "PASS",
+      "evidence": "group rank does not mix tokenized equities",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 130
+      }
+    },
+    {
+      "check": "tests.test_regressions.ResearchTests.test_insufficient_ablation_data_raises",
+      "status": "PASS",
+      "evidence": "insufficient ablation data raises",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 206
+      }
+    },
+    {
+      "check": "tests.test_regressions.ResearchTests.test_mean_reversion_spikes",
+      "status": "PASS",
+      "evidence": "mean reversion spikes",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 61
+      }
+    },
+    {
+      "check": "tests.test_regressions.ResearchTests.test_missing_future_price_stays_unknown",
+      "status": "PASS",
+      "evidence": "missing future price stays unknown",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 99
+      }
+    },
+    {
+      "check": "tests.test_regressions.ResearchTests.test_model_runtime_mismatch_rejected_before_deserialization",
+      "status": "PASS",
+      "evidence": "model runtime mismatch rejected before deserialization",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 225
+      }
+    },
+    {
+      "check": "tests.test_regressions.ResearchTests.test_momentum_direction_and_horizons",
+      "status": "PASS",
+      "evidence": "momentum direction and horizons",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 55
+      }
+    },
+    {
+      "check": "tests.test_regressions.ResearchTests.test_negative_expected_payoff_cannot_pass_cost_gate",
+      "status": "PASS",
+      "evidence": "negative expected payoff cannot pass cost gate",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 145
+      }
+    },
+    {
+      "check": "tests.test_regressions.ResearchTests.test_overlapping_validation_windows_rejected",
+      "status": "PASS",
+      "evidence": "overlapping validation windows rejected",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 112
+      }
+    },
+    {
+      "check": "tests.test_regressions.ResearchTests.test_provenance_guard_requires_availability",
+      "status": "PASS",
+      "evidence": "provenance guard requires availability",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 116
+      }
+    },
+    {
+      "check": "tests.test_regressions.ResearchTests.test_regression_target_uses_regressor",
+      "status": "PASS",
+      "evidence": "regression target uses regressor",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 164
+      }
+    },
+    {
+      "check": "tests.test_regressions.ResearchTests.test_rsi_all_gains_losses_and_flat",
+      "status": "PASS",
+      "evidence": "rsi all gains losses and flat",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 67
+      }
+    },
+    {
+      "check": "tests.test_regressions.ResearchTests.test_split_defaults_follow_runtime_config",
+      "status": "PASS",
+      "evidence": "split defaults follow runtime config",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 107
+      }
+    },
+    {
+      "check": "tests.test_regressions.ResearchTests.test_split_purges_horizon",
+      "status": "PASS",
+      "evidence": "split purges horizon",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 103
+      }
+    },
+    {
+      "check": "tests.test_regressions.ResearchTests.test_temporal_classifier_training_and_payoff_bounds",
+      "status": "PASS",
+      "evidence": "temporal classifier training and payoff bounds",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 152
+      }
+    },
+    {
+      "check": "tests.test_regressions.ResearchTests.test_training_cli_artifact_loads_in_another_process",
+      "status": "PASS",
+      "evidence": "training cli artifact loads in another process",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 210
+      }
+    },
+    {
+      "check": "tests.test_regressions.ResearchTests.test_unknown_outcomes_remain_unknown",
+      "status": "PASS",
+      "evidence": "unknown outcomes remain unknown",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 94
+      }
+    },
+    {
+      "check": "tests.test_regressions.TransportTests.test_api_rate_budget",
+      "status": "PASS",
+      "evidence": "api rate budget",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 494
+      }
+    },
+    {
+      "check": "tests.test_regressions.TransportTests.test_documented_module_resolves_after_install",
+      "status": "PASS",
+      "evidence": "documented module resolves after install",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 539
+      }
+    },
+    {
+      "check": "tests.test_regressions.TransportTests.test_live_merged_short_logs_only_incremental_fill",
+      "status": "PASS",
+      "evidence": "live merged short logs only incremental fill",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 528
+      }
+    },
+    {
+      "check": "tests.test_regressions.TransportTests.test_live_partial_fill_blocks_further_orders",
+      "status": "PASS",
+      "evidence": "live partial fill blocks further orders",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 512
+      }
+    },
+    {
+      "check": "tests.test_regressions.TransportTests.test_live_wallet_reconciliation",
+      "status": "PASS",
+      "evidence": "live wallet reconciliation",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 519
+      }
+    },
+    {
+      "check": "tests.test_regressions.TransportTests.test_missing_models_fail_before_any_api_call",
+      "status": "PASS",
+      "evidence": "missing models fail before any api call",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 545
+      }
+    },
+    {
+      "check": "tests.test_regressions.TransportTests.test_order_timeout_not_retried",
+      "status": "PASS",
+      "evidence": "order timeout not retried",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 479
+      }
+    },
+    {
+      "check": "tests.test_regressions.TransportTests.test_read_retry_refreshes_signature",
+      "status": "PASS",
+      "evidence": "read retry refreshes signature",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 484
+      }
+    },
+    {
+      "check": "tests.test_regressions.TransportTests.test_signing_reads_current_secret_and_does_not_mutate_payload",
+      "status": "PASS",
+      "evidence": "signing reads current secret and does not mutate payload",
+      "source": {
+        "path": "tests/test_regressions.py",
+        "line": 504
+      }
+    }
+  ],
+  "coverage": {
+    "method": "Current source review against all 34 parts and all 11 Part 21 strategy families, plus AST parameter-use inventory. Original findings preserved separately in the baseline audit. Feature availability is not proof of learned strategy behavior or economic value.",
+    "strategies": [
+      {
+        "family": "Trend following",
+        "status": "feature_only",
+        "assessment": "MA ratios, slopes and trend strength exist; no standalone MA trend strategy or live trend rule.",
+        "files": [
+          "features/momentum.py",
+          "features/regime.py"
+        ],
+        "handbook_source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1112
+        }
+      },
+      {
+        "family": "Moving-average crossover",
+        "status": "feature_only",
+        "assessment": "SMA fast=5/slow=20 features; no explicit crossover entry/exit baseline; EMA not implemented.",
+        "files": [
+          "features/momentum.py"
+        ],
+        "handbook_source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1112
+        }
+      },
+      {
+        "family": "Momentum",
+        "status": "baseline_and_features",
+        "assessment": "Returns at 1/5/10/20/30 ticks and a ret_5 > 0 long/flat baseline. Live ML can consume features; directional behavior and added value unverified.",
+        "files": [
+          "features/momentum.py",
+          "backtest/ablation.py"
+        ],
+        "handbook_source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1112
+        }
+      },
+      {
+        "family": "Mean reversion",
+        "status": "baseline_and_features",
+        "assessment": "20-tick z-score, z-score change, reversal return; backtest long below -1.5/short above +1.5. Shared targets and spot exits implemented; paper/live short adapters use separate collateral accounting. Shorts remain disabled pending permission.",
+        "files": [
+          "features/mean_reversion.py",
+          "backtest/ablation.py"
+        ],
+        "handbook_source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1112
+        }
+      },
+      {
+        "family": "RSI mean reversion",
+        "status": "feature_only",
+        "assessment": "20-tick simple rolling RSI feature, including gains-only/losses-only/flat edge cases; no dedicated 30/70 strategy rule.",
+        "files": [
+          "features/mean_reversion.py"
+        ],
+        "handbook_source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1112
+        }
+      },
+      {
+        "family": "Bollinger reversion",
+        "status": "feature_only",
+        "assessment": "20-tick, 2-standard-deviation band position; no dedicated band entry/exit rule.",
+        "files": [
+          "features/mean_reversion.py"
+        ],
+        "handbook_source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1112
+        }
+      },
+      {
+        "family": "Breakout",
+        "status": "missing",
+        "assessment": "No prior-range highs/lows, channel break or breakout entry/exit baseline.",
+        "files": [],
+        "handbook_source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1112
+        }
+      },
+      {
+        "family": "Volatility breakout",
+        "status": "missing",
+        "assessment": "Realized volatility exists as context/sizing input; no return-versus-volatility breakout trigger.",
+        "files": [
+          "features/regime.py",
+          "sizing.py"
+        ],
+        "handbook_source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1112
+        }
+      },
+      {
+        "family": "Volume-based",
+        "status": "raw_data_only",
+        "assessment": "Raw ticker trade-value fields retained, but no relative-volume, volume-change, volume-z-score or confirmation strategy. Raw fields reaching ML is not a defined volume strategy.",
+        "files": [
+          "data/collector.py"
+        ],
+        "handbook_source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1112
+        }
+      },
+      {
+        "family": "Cross-sectional momentum",
+        "status": "baseline_and_features",
+        "assessment": "5-tick ranks/percentiles and relative returns; baseline thresholds 0.7/0.3. Bounded quote age and within-group ranking added; empirical basket diversification and market-neutral performance remain unverified.",
+        "files": [
+          "features/cross_sectional.py",
+          "backtest/ablation.py"
+        ],
+        "handbook_source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1112
+        }
+      },
+      {
+        "family": "Multi-factor / ensembles",
+        "status": "partial",
+        "assessment": "Averaged momentum/z-score baseline and classifier feature combination exist. Purged temporal calibration and paired component comparisons added; historical contribution and portfolio P&L diversification remain untested.",
+        "files": [
+          "backtest/ablation.py",
+          "model/train.py"
+        ],
+        "handbook_source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1112
+        }
+      }
+    ],
+    "handbook_sections": [
+      {
+        "part": 1,
+        "title": "PART 1 \u2014 WHAT ALGORITHMIC TRADING ACTUALLY IS",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 100
+        },
+        "status": "partial",
+        "assessment": "Shared signal-to-target rules and cash/quantity order deltas added; historical hypothesis evidence remains missing."
+      },
+      {
+        "part": 2,
+        "title": "PART 2 \u2014 BASIC MARKET AND CRYPTO TRADING CONCEPTS",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 176
+        },
+        "status": "partial",
+        "assessment": "Spot and collateral-based short API conventions checked against official documentation; account permissions and spot fees still require verification."
+      },
+      {
+        "part": 3,
+        "title": "PART 3 \u2014 PRICE DATA AND MARKET DATA",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 225
+        },
+        "status": "partial",
+        "assessment": "Exact duplicates removed, conflicts rejected, writes atomic, stale quotes/history gaps rejected and groups separated. Sampling cadence/outlier policy remains a research input."
+      },
+      {
+        "part": 4,
+        "title": "PART 4 \u2014 STATISTICS EVERY ALGORITHMIC TRADER SHOULD KNOW",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 311
+        },
+        "status": "partial",
+        "assessment": "Signed training-only conditional payoffs replace probability-as-return. Broader statistical uncertainty and trade-level research remain missing."
+      },
+      {
+        "part": 5,
+        "title": "PART 5 \u2014 PROBABILITY AND STATISTICAL THINKING",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 392
+        },
+        "status": "missing_research_evidence",
+        "assessment": "No uncertainty intervals, trial accounting or multiple-testing safeguards."
+      },
+      {
+        "part": 6,
+        "title": "PART 6 \u2014 TIME SERIES BASICS",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 444
+        },
+        "status": "partial",
+        "assessment": "Rolling returns and volatility exist; no stationarity or autocorrelation research."
+      },
+      {
+        "part": 7,
+        "title": "PART 7 \u2014 FEATURES AND INDICATORS",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 487
+        },
+        "status": "partial",
+        "assessment": "Returns/SMA/z-score/RSI/Bollinger/ranks/volatility implemented; no EMA, ATR, MACD, stochastic, VWAP or derived volume features."
+      },
+      {
+        "part": 8,
+        "title": "PART 8 \u2014 SIGNAL GENERATION",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 539
+        },
+        "status": "partial",
+        "assessment": "Shared rule and model target interfaces with long/flat exits and optional signed targets; three rule families, not every handbook example."
+      },
+      {
+        "part": 9,
+        "title": "PART 9 \u2014 POSITION SIZING",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 597
+        },
+        "status": "implemented_offline",
+        "assessment": "Finite confidence/volatility sizing, per-asset/gross caps, cash reserves and rounded quantity conversion tested with synthetic fixtures."
+      },
+      {
+        "part": 10,
+        "title": "PART 10 \u2014 LONG/SHORT STRATEGIES",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 639
+        },
+        "status": "implemented_offline",
+        "assessment": "Spot sells reduce holdings; separate collateral-based paper/live short adapters support opening/closing. Shorts disabled by default; actual account behavior untested."
+      },
+      {
+        "part": 11,
+        "title": "PART 11 \u2014 BACKTESTING",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 665
+        },
+        "status": "implemented_offline",
+        "assessment": "Sequential delayed-fill ledger, explicit terminal liquidation and initial-equity peaks; multi-asset runner accounting tested. Real venue parity unverified."
+      },
+      {
+        "part": 12,
+        "title": "PART 12 \u2014 HOW TO ACCIDENTALLY FAKE A PROFITABLE STRATEGY",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 737
+        },
+        "status": "implemented_offline",
+        "assessment": "Unknown labels masked; actual label-availability times checked at purged boundaries. Feature builders pass future-shock prefix invariance; arbitrary feature provenance cannot be inferred from values."
+      },
+      {
+        "part": 13,
+        "title": "PART 13 \u2014 TRAINING / VALIDATION / TESTING",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 811
+        },
+        "status": "partial",
+        "assessment": "Purged rolling validation and internal chronological probability calibration added. Final historical holdout not yet frozen or evaluated."
+      },
+      {
+        "part": 14,
+        "title": "PART 14 \u2014 OVERFITTING",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 846
+        },
+        "status": "partial",
+        "assessment": "Training/validation scores recorded; no parameter stability or held-out evidence."
+      },
+      {
+        "part": 15,
+        "title": "PART 15 \u2014 ROBUSTNESS TESTING",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 880
+        },
+        "status": "partial",
+        "assessment": "Offline failure fixtures cover stale quotes, gaps, duplicates, repeated orders, drawdown/rate limits, partial fills and uncertain responses. Historical parameter/cost/period stress grid not run."
+      },
+      {
+        "part": 16,
+        "title": "PART 16 \u2014 PERFORMANCE METRICS",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 924
+        },
+        "status": "partial",
+        "assessment": "Terminal fees and initial-equity drawdown fixed; finite RMS-downside convention and explicit undefined annualization handling. Closed-trade expectancy/profit factor and organizer metric parity remain pending."
+      },
+      {
+        "part": 17,
+        "title": "PART 17 \u2014 TRANSACTION COSTS AND EXECUTION",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 980
+        },
+        "status": "partial",
+        "assessment": "Training-only expected-return gate, live spread allowance and paper bid/ask/slippage/fees. Maker resting-fill model explicitly unsupported; measured venue costs not available."
+      },
+      {
+        "part": 18,
+        "title": "PART 18 \u2014 MARKET MICROSTRUCTURE",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1010
+        },
+        "status": "partial",
+        "assessment": "Bid/ask used for paper fills and runner spread gate; depth, impact and actual execution calibration remain unverified."
+      },
+      {
+        "part": 19,
+        "title": "PART 19 \u2014 RISK MANAGEMENT",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1036
+        },
+        "status": "partial",
+        "assessment": "Per-asset/gross caps, drawdown halt, persisted hourly reservations and shared request budget integrated and tested. Daily loss and correlated concentration policies remain research choices."
+      },
+      {
+        "part": 20,
+        "title": "PART 20 \u2014 PORTFOLIO CONSTRUCTION",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1084
+        },
+        "status": "partial",
+        "assessment": "Signed gross exposure helper and runner portfolio sizing integrated; correlated cluster limits and empirical multi-asset diversification not established."
+      },
+      {
+        "part": 21,
+        "title": "PART 21 \u2014 STRATEGY IDEAS FOR A BEGINNER",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1112
+        },
+        "status": "partial",
+        "assessment": "Three shared explicit rule families plus model feature combination. Missing breakout/volume examples remain optional research, not silently claimed coverage."
+      },
+      {
+        "part": 22,
+        "title": "PART 22 \u2014 COMBINING STRATEGIES",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1211
+        },
+        "status": "partial",
+        "assessment": "Same-model/common-OOS regime/cost/sizing comparisons added; component switches respected. Empirical diversification and economic contribution still untested."
+      },
+      {
+        "part": 23,
+        "title": "PART 23 \u2014 MACHINE LEARNING",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1234
+        },
+        "status": "partial",
+        "assessment": "Training-only scaler, purged temporal probability calibration, conditional payoffs, fixed schema, regression support and source/config model artifacts. Real prediction stability and held-out economic value remain untested."
+      },
+      {
+        "part": 24,
+        "title": "PART 24 \u2014 REINFORCEMENT LEARNING",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1278
+        },
+        "status": "optional_not_implemented",
+        "assessment": "Reinforcement learning absent; handbook describes it as generally unnecessary for this beginner setting."
+      },
+      {
+        "part": 25,
+        "title": "PART 25 \u2014 BOT ARCHITECTURE",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1295
+        },
+        "status": "implemented_offline",
+        "assessment": "Editable packaging fixes module startup. Explicit model loading, stateful paper ledger, live reconciliation adapter, delta planning and pre-submission uncertainty persistence added; API behavior only mocked."
+      },
+      {
+        "part": 26,
+        "title": "PART 26 \u2014 LIVE TRADING VS BACKTESTING",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1355
+        },
+        "status": "partial",
+        "assessment": "Public/signed transport, shared rate budget, no mutation retries and fail-closed partial/pending/unknown states tested. Real partial fills, outages and recovery require paper/sandbox evidence."
+      },
+      {
+        "part": 27,
+        "title": "PART 27 \u2014 PAPER TRADING / DRY RUN",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1377
+        },
+        "status": "implemented_offline",
+        "assessment": "Paper cash, quantities, collateral, bid/ask/slippage fills, fees and persisted restart state implemented; sustained online paper run not yet performed."
+      },
+      {
+        "part": 28,
+        "title": "PART 28 \u2014 LOGGING AND DEBUGGING",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1396
+        },
+        "status": "partial",
+        "assessment": "Structured confirmed-fill events with quantity/price/fees/target/equity and persisted risk state. Production monitoring and venue slippage calibration remain future work."
+      },
+      {
+        "part": 29,
+        "title": "PART 29 \u2014 SOFTWARE ENGINEERING PRACTICES",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1436
+        },
+        "status": "partial",
+        "assessment": "Editable package, configuration, seed, checksummed model/schema manifests and deterministic offline regression suite. Historical data/experiment manifests still needed."
+      },
+      {
+        "part": 30,
+        "title": "PART 30 \u2014 EXPERIMENTATION WORKFLOW",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1492
+        },
+        "status": "partial",
+        "assessment": "Paired/common-OOS one-factor comparison scaffold repaired. Freeze data/parameters and record economic experiments before selection."
+      },
+      {
+        "part": 31,
+        "title": "PART 31 \u2014 HOW TO CONDUCT A GOOD TRADING EXPERIMENT",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1558
+        },
+        "status": "missing_research_evidence",
+        "assessment": "No frozen hypothesis/data/config/cost records or rejected-experiment log."
+      },
+      {
+        "part": 32,
+        "title": "PART 32 \u2014 20 THINGS THAT WILL PROBABLY GO WRONG IN YOUR FIRST TRADING BOT",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1584
+        },
+        "status": "partial",
+        "assessment": "Original reproducible defects repaired and covered by regression fixtures. Remaining market/operational risks require evidence beyond fixtures."
+      },
+      {
+        "part": 33,
+        "title": "PART 33 \u2014 HACKATHON STRATEGY",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1629
+        },
+        "status": "not_code_requirement",
+        "assessment": "Team responsibilities, staged research and fallback operation are process choices; deployment instructions alone do not demonstrate readiness."
+      },
+      {
+        "part": 34,
+        "title": "PART 34 \u2014 FINAL CHEAT SHEET",
+        "source": {
+          "path": "Crypto_Algorithmic_Trading_Hackathon_Handbook.md",
+          "line": 1681
+        },
+        "status": "partial",
+        "assessment": "Some essential formulas implemented; final trust questions remain unresolved without out-of-sample/robustness and venue evidence."
+      }
+    ],
+    "parameters": [
+      {
+        "parameter": "BASE_URL",
+        "value": "https://mock-api.roostoo.com",
+        "source": {
+          "path": "config.py",
+          "line": 19
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/execution/trader.py",
+            "line": 57
+          },
+          {
+            "path": "build/lib/roostoo_bot/execution/trader.py",
+            "line": 59
+          },
+          {
+            "path": "execution/trader.py",
+            "line": 57
+          },
+          {
+            "path": "execution/trader.py",
+            "line": 59
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "UNIVERSE_GROUPS",
+        "value": {
+          "majors": [
+            "BTC/USD",
+            "ETH/USD",
+            "SOL/USD",
+            "BNB/USD",
+            "XRP/USD",
+            "ADA/USD",
+            "DOGE/USD",
+            "LINK/USD",
+            "AVAX/USD",
+            "DOT/USD",
+            "LTC/USD",
+            "TRX/USD",
+            "TON/USD",
+            "SUI/USD",
+            "APT/USD",
+            "NEAR/USD",
+            "ICP/USD",
+            "HBAR/USD",
+            "FIL/USD",
+            "XLM/USD"
+          ],
+          "defi_midcap": [
+            "UNI/USD",
+            "AAVE/USD",
+            "CRV/USD",
+            "PENDLE/USD",
+            "CAKE/USD",
+            "ONDO/USD",
+            "ENA/USD",
+            "ARB/USD",
+            "POL/USD",
+            "SEI/USD",
+            "CFX/USD"
+          ],
+          "tokenized_equities": [
+            "NVDAB/USD",
+            "TSLAB/USD",
+            "GOOGLB/USD",
+            "MSFTB/USD",
+            "AMDB/USD",
+            "QCOMB/USD",
+            "INTCB/USD",
+            "SNDKB/USD",
+            "CRCLB/USD",
+            "MSTRB/USD",
+            "SPCXB/USD",
+            "LITEB/USD",
+            "COINB/USD",
+            "SKHYB/USD",
+            "CBRSB/USD"
+          ],
+          "meme_high_vol": [
+            "PEPE/USD",
+            "SHIB/USD",
+            "BONK/USD",
+            "WIF/USD",
+            "FLOKI/USD",
+            "1000CHEEMS/USD",
+            "TRUMP/USD",
+            "PENGU/USD"
+          ],
+          "unverified": [
+            "EDEN/USD",
+            "MIRA/USD",
+            "STO/USD",
+            "OMNI/USD",
+            "OPEN/USD",
+            "HEMI/USD",
+            "TUT/USD",
+            "BMT/USD",
+            "BIO/USD",
+            "GLWB/USD",
+            "WDCB/USD",
+            "AVNT/USD",
+            "XPL/USD",
+            "LISTA/USD",
+            "VIRTUAL/USD",
+            "SOMI/USD",
+            "FORM/USD",
+            "LINEA/USD",
+            "EIGEN/USD",
+            "PLUME/USD",
+            "NBISB/USD",
+            "METAB/USD",
+            "WLFI/USD",
+            "ASTER/USD",
+            "ZEN/USD",
+            "MUB/USD",
+            "WLD/USD",
+            "ZEC/USD"
+          ]
+        },
+        "source": {
+          "path": "config.py",
+          "line": 35
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/features/build_features.py",
+            "line": 53
+          },
+          {
+            "path": "features/build_features.py",
+            "line": 53
+          }
+        ],
+        "assessment": "Grouping enforced during feature construction, including expanded universes."
+      },
+      {
+        "parameter": "UNIVERSE",
+        "value": [
+          "BTC/USD",
+          "ETH/USD",
+          "SOL/USD",
+          "BNB/USD",
+          "XRP/USD",
+          "ADA/USD",
+          "DOGE/USD",
+          "LINK/USD",
+          "AVAX/USD",
+          "DOT/USD",
+          "LTC/USD",
+          "TRX/USD",
+          "TON/USD",
+          "SUI/USD",
+          "APT/USD",
+          "NEAR/USD",
+          "ICP/USD",
+          "HBAR/USD",
+          "FIL/USD",
+          "XLM/USD"
+        ],
+        "source": {
+          "path": "config.py",
+          "line": 68
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/data/collector.py",
+            "line": 24
+          },
+          {
+            "path": "build/lib/roostoo_bot/data/collector.py",
+            "line": 41
+          },
+          {
+            "path": "build/lib/roostoo_bot/main.py",
+            "line": 193
+          },
+          {
+            "path": "build/lib/roostoo_bot/main.py",
+            "line": 169
+          },
+          {
+            "path": "build/lib/roostoo_bot/model/train.py",
+            "line": 192
+          },
+          {
+            "path": "data/collector.py",
+            "line": 24
+          },
+          {
+            "path": "data/collector.py",
+            "line": 41
+          },
+          {
+            "path": "main.py",
+            "line": 193
+          },
+          {
+            "path": "main.py",
+            "line": 169
+          },
+          {
+            "path": "model/train.py",
+            "line": 192
+          },
+          {
+            "path": "tests/test_regressions.py",
+            "line": 315
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "MARKET_PROXY",
+        "value": "BTC/USD",
+        "source": {
+          "path": "config.py",
+          "line": 69
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/features/build_features.py",
+            "line": 47
+          },
+          {
+            "path": "build/lib/roostoo_bot/features/build_features.py",
+            "line": 47
+          },
+          {
+            "path": "build/lib/roostoo_bot/features/build_features.py",
+            "line": 48
+          },
+          {
+            "path": "build/lib/roostoo_bot/features/cross_sectional.py",
+            "line": 26
+          },
+          {
+            "path": "build/lib/roostoo_bot/features/cross_sectional.py",
+            "line": 26
+          },
+          {
+            "path": "features/build_features.py",
+            "line": 47
+          },
+          {
+            "path": "features/build_features.py",
+            "line": 47
+          },
+          {
+            "path": "features/build_features.py",
+            "line": 48
+          },
+          {
+            "path": "features/cross_sectional.py",
+            "line": 26
+          },
+          {
+            "path": "features/cross_sectional.py",
+            "line": 26
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "POLL_INTERVAL_SECONDS",
+        "value": 60,
+        "source": {
+          "path": "config.py",
+          "line": 75
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/data/collector.py",
+            "line": 40
+          },
+          {
+            "path": "build/lib/roostoo_bot/main.py",
+            "line": 173
+          },
+          {
+            "path": "build/lib/roostoo_bot/scripts/backtest_sol.py",
+            "line": 94
+          },
+          {
+            "path": "data/collector.py",
+            "line": 40
+          },
+          {
+            "path": "main.py",
+            "line": 173
+          },
+          {
+            "path": "scripts/backtest_sol.py",
+            "line": 94
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "STORE_DIR",
+        "value": "data_store",
+        "source": {
+          "path": "config.py",
+          "line": 76
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/data/store.py",
+            "line": 16
+          },
+          {
+            "path": "build/lib/roostoo_bot/data/store.py",
+            "line": 22
+          },
+          {
+            "path": "build/lib/roostoo_bot/data/store.py",
+            "line": 30
+          },
+          {
+            "path": "data/store.py",
+            "line": 16
+          },
+          {
+            "path": "data/store.py",
+            "line": 22
+          },
+          {
+            "path": "data/store.py",
+            "line": 30
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "INITIAL_CAPITAL",
+        "value": 100000.0,
+        "source": {
+          "path": "config.py",
+          "line": 79
+        },
+        "references": [
+          {
+            "path": "backtest/engine.py",
+            "line": 27
+          },
+          {
+            "path": "build/lib/roostoo_bot/backtest/engine.py",
+            "line": 27
+          },
+          {
+            "path": "build/lib/roostoo_bot/execution/portfolio.py",
+            "line": 89
+          },
+          {
+            "path": "execution/portfolio.py",
+            "line": 89
+          }
+        ],
+        "assessment": "Used as paper/backtest initial capital; live sizing uses reconciled equity."
+      },
+      {
+        "parameter": "COMPETITION_DURATION_DAYS",
+        "value": 14,
+        "source": {
+          "path": "config.py",
+          "line": 80
+        },
+        "references": [],
+        "assessment": "Declared only; no duration-driven shutdown or evaluation window."
+      },
+      {
+        "parameter": "NO_LEVERAGE",
+        "value": true,
+        "source": {
+          "path": "config.py",
+          "line": 81
+        },
+        "references": [],
+        "assessment": "Runner gross/per-asset caps and collateral/cash reservations enforce no leverage; flag itself is declarative."
+      },
+      {
+        "parameter": "NO_HFT",
+        "value": true,
+        "source": {
+          "path": "config.py",
+          "line": 82
+        },
+        "references": [],
+        "assessment": "Declarative flag; slow polling is configured separately."
+      },
+      {
+        "parameter": "BARS_PER_YEAR",
+        "value": 525600,
+        "source": {
+          "path": "config.py",
+          "line": 86
+        },
+        "references": [
+          {
+            "path": "backtest/engine.py",
+            "line": 97
+          },
+          {
+            "path": "build/lib/roostoo_bot/backtest/engine.py",
+            "line": 97
+          },
+          {
+            "path": "build/lib/roostoo_bot/scripts/backtest_sol.py",
+            "line": 95
+          },
+          {
+            "path": "scripts/backtest_sol.py",
+            "line": 95
+          }
+        ],
+        "assessment": "Research annualization assumes the configured observation cadence; runner rejects large recent gaps. Sampling regularity must be verified in historical inputs."
+      },
+      {
+        "parameter": "MOMENTUM_HORIZONS",
+        "value": [
+          1,
+          5,
+          10,
+          20,
+          30
+        ],
+        "source": {
+          "path": "config.py",
+          "line": 89
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/features/momentum.py",
+            "line": 17
+          },
+          {
+            "path": "build/lib/roostoo_bot/features/momentum.py",
+            "line": 37
+          },
+          {
+            "path": "build/lib/roostoo_bot/main.py",
+            "line": 65
+          },
+          {
+            "path": "features/momentum.py",
+            "line": 17
+          },
+          {
+            "path": "features/momentum.py",
+            "line": 37
+          },
+          {
+            "path": "main.py",
+            "line": 65
+          },
+          {
+            "path": "tests/test_regressions.py",
+            "line": 57
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "MA_WINDOWS",
+        "value": {
+          "fast": 5,
+          "slow": 20
+        },
+        "source": {
+          "path": "config.py",
+          "line": 90
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/features/momentum.py",
+            "line": 21
+          },
+          {
+            "path": "build/lib/roostoo_bot/features/momentum.py",
+            "line": 22
+          },
+          {
+            "path": "build/lib/roostoo_bot/main.py",
+            "line": 65
+          },
+          {
+            "path": "features/momentum.py",
+            "line": 21
+          },
+          {
+            "path": "features/momentum.py",
+            "line": 22
+          },
+          {
+            "path": "main.py",
+            "line": 65
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "MEAN_REV_WINDOW",
+        "value": 20,
+        "source": {
+          "path": "config.py",
+          "line": 91
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/features/mean_reversion.py",
+            "line": 32
+          },
+          {
+            "path": "build/lib/roostoo_bot/main.py",
+            "line": 66
+          },
+          {
+            "path": "features/mean_reversion.py",
+            "line": 32
+          },
+          {
+            "path": "main.py",
+            "line": 66
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "BOLLINGER_WINDOW",
+        "value": 20,
+        "source": {
+          "path": "config.py",
+          "line": 92
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/features/mean_reversion.py",
+            "line": 49
+          },
+          {
+            "path": "features/mean_reversion.py",
+            "line": 49
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "BOLLINGER_STD",
+        "value": 2,
+        "source": {
+          "path": "config.py",
+          "line": 93
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/features/mean_reversion.py",
+            "line": 50
+          },
+          {
+            "path": "features/mean_reversion.py",
+            "line": 50
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "REGIME_VOL_WINDOW",
+        "value": 30,
+        "source": {
+          "path": "config.py",
+          "line": 94
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/features/regime.py",
+            "line": 17
+          },
+          {
+            "path": "build/lib/roostoo_bot/main.py",
+            "line": 66
+          },
+          {
+            "path": "features/regime.py",
+            "line": 17
+          },
+          {
+            "path": "main.py",
+            "line": 66
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "REGIME_TREND_WINDOW",
+        "value": 30,
+        "source": {
+          "path": "config.py",
+          "line": 95
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/features/regime.py",
+            "line": 18
+          },
+          {
+            "path": "build/lib/roostoo_bot/main.py",
+            "line": 66
+          },
+          {
+            "path": "features/regime.py",
+            "line": 18
+          },
+          {
+            "path": "main.py",
+            "line": 66
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "TARGET_HORIZON",
+        "value": 10,
+        "source": {
+          "path": "config.py",
+          "line": 98
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/model/targets.py",
+            "line": 14
+          },
+          {
+            "path": "build/lib/roostoo_bot/model/train.py",
+            "line": 50
+          },
+          {
+            "path": "build/lib/roostoo_bot/model/train.py",
+            "line": 63
+          },
+          {
+            "path": "build/lib/roostoo_bot/model/train.py",
+            "line": 135
+          },
+          {
+            "path": "build/lib/roostoo_bot/scripts/backtest_sol.py",
+            "line": 98
+          },
+          {
+            "path": "build/lib/roostoo_bot/scripts/backtest_sol.py",
+            "line": 124
+          },
+          {
+            "path": "build/lib/roostoo_bot/scripts/backtest_sol.py",
+            "line": 131
+          },
+          {
+            "path": "model/targets.py",
+            "line": 14
+          },
+          {
+            "path": "model/train.py",
+            "line": 50
+          },
+          {
+            "path": "model/train.py",
+            "line": 63
+          },
+          {
+            "path": "model/train.py",
+            "line": 135
+          },
+          {
+            "path": "scripts/backtest_sol.py",
+            "line": 98
+          },
+          {
+            "path": "scripts/backtest_sol.py",
+            "line": 124
+          },
+          {
+            "path": "scripts/backtest_sol.py",
+            "line": 131
+          },
+          {
+            "path": "tests/test_regressions.py",
+            "line": 105
+          }
+        ],
+        "assessment": "Used in labels and purging; runner re-evaluates targets each fresh quote rather than promising a fixed holding duration."
+      },
+      {
+        "parameter": "TARGET_MODE",
+        "value": "threshold",
+        "source": {
+          "path": "config.py",
+          "line": 100
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/model/targets.py",
+            "line": 34
+          },
+          {
+            "path": "build/lib/roostoo_bot/model/train.py",
+            "line": 62
+          },
+          {
+            "path": "build/lib/roostoo_bot/model/train.py",
+            "line": 113
+          },
+          {
+            "path": "model/targets.py",
+            "line": 34
+          },
+          {
+            "path": "model/train.py",
+            "line": 62
+          },
+          {
+            "path": "model/train.py",
+            "line": 113
+          }
+        ],
+        "assessment": "Threshold/direction calibrated classifiers and explicit ridge/random-forest regression supported."
+      },
+      {
+        "parameter": "TAKER_FEE",
+        "value": 0.001,
+        "source": {
+          "path": "config.py",
+          "line": 103
+        },
+        "references": [
+          {
+            "path": "backtest/engine.py",
+            "line": 57
+          },
+          {
+            "path": "build/lib/roostoo_bot/backtest/engine.py",
+            "line": 57
+          },
+          {
+            "path": "build/lib/roostoo_bot/costs.py",
+            "line": 13
+          },
+          {
+            "path": "build/lib/roostoo_bot/execution/portfolio.py",
+            "line": 103
+          },
+          {
+            "path": "build/lib/roostoo_bot/execution/portfolio.py",
+            "line": 163
+          },
+          {
+            "path": "build/lib/roostoo_bot/main.py",
+            "line": 119
+          },
+          {
+            "path": "costs.py",
+            "line": 13
+          },
+          {
+            "path": "execution/portfolio.py",
+            "line": 103
+          },
+          {
+            "path": "execution/portfolio.py",
+            "line": 163
+          },
+          {
+            "path": "main.py",
+            "line": 119
+          }
+        ],
+        "assessment": "Used in costs; venue fee assumption has not been freshly verified."
+      },
+      {
+        "parameter": "MAKER_FEE",
+        "value": 0.0005,
+        "source": {
+          "path": "config.py",
+          "line": 104
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/costs.py",
+            "line": 13
+          },
+          {
+            "path": "costs.py",
+            "line": 13
+          }
+        ],
+        "assessment": "Cost helper supports maker setting; live order call uses MARKET, no resting/fill behavior tested."
+      },
+      {
+        "parameter": "ROUND_TRIP_COST_ESTIMATE",
+        "value": 0.002,
+        "source": {
+          "path": "config.py",
+          "line": 105
+        },
+        "references": [],
+        "assessment": "Configuration/catalog value; see dependent settings, not an independent live guard."
+      },
+      {
+        "parameter": "SLIPPAGE_ESTIMATE",
+        "value": 0.0003,
+        "source": {
+          "path": "config.py",
+          "line": 106
+        },
+        "references": [
+          {
+            "path": "backtest/engine.py",
+            "line": 62
+          },
+          {
+            "path": "backtest/engine.py",
+            "line": 57
+          },
+          {
+            "path": "build/lib/roostoo_bot/backtest/engine.py",
+            "line": 62
+          },
+          {
+            "path": "build/lib/roostoo_bot/backtest/engine.py",
+            "line": 57
+          },
+          {
+            "path": "build/lib/roostoo_bot/costs.py",
+            "line": 16
+          },
+          {
+            "path": "build/lib/roostoo_bot/execution/portfolio.py",
+            "line": 163
+          },
+          {
+            "path": "build/lib/roostoo_bot/execution/portfolio.py",
+            "line": 98
+          },
+          {
+            "path": "build/lib/roostoo_bot/execution/portfolio.py",
+            "line": 197
+          },
+          {
+            "path": "build/lib/roostoo_bot/main.py",
+            "line": 119
+          },
+          {
+            "path": "costs.py",
+            "line": 16
+          },
+          {
+            "path": "execution/portfolio.py",
+            "line": 163
+          },
+          {
+            "path": "execution/portfolio.py",
+            "line": 98
+          },
+          {
+            "path": "execution/portfolio.py",
+            "line": 197
+          },
+          {
+            "path": "main.py",
+            "line": 119
+          }
+        ],
+        "assessment": "Paper fills split this assumed round-trip slippage by side; spread uses observed bid/ask. Actual fill calibration remains pending."
+      },
+      {
+        "parameter": "SAFETY_MARGIN",
+        "value": 0.0003,
+        "source": {
+          "path": "config.py",
+          "line": 107
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/costs.py",
+            "line": 20
+          },
+          {
+            "path": "build/lib/roostoo_bot/costs.py",
+            "line": 24
+          },
+          {
+            "path": "costs.py",
+            "line": 20
+          },
+          {
+            "path": "costs.py",
+            "line": 24
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "TARGET_THRESHOLD",
+        "value": 0.0026,
+        "source": {
+          "path": "config.py",
+          "line": 108
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/model/targets.py",
+            "line": 28
+          },
+          {
+            "path": "model/targets.py",
+            "line": 28
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "MAX_POSITION_PER_ASSET",
+        "value": 0.2,
+        "source": {
+          "path": "config.py",
+          "line": 117
+        },
+        "references": [
+          {
+            "path": "backtest/ablation.py",
+            "line": 50
+          },
+          {
+            "path": "build/lib/roostoo_bot/backtest/ablation.py",
+            "line": 50
+          },
+          {
+            "path": "build/lib/roostoo_bot/execution/portfolio.py",
+            "line": 181
+          },
+          {
+            "path": "build/lib/roostoo_bot/main.py",
+            "line": 115
+          },
+          {
+            "path": "build/lib/roostoo_bot/scripts/backtest_sol.py",
+            "line": 138
+          },
+          {
+            "path": "build/lib/roostoo_bot/sizing.py",
+            "line": 9
+          },
+          {
+            "path": "build/lib/roostoo_bot/sizing.py",
+            "line": 24
+          },
+          {
+            "path": "build/lib/roostoo_bot/sizing.py",
+            "line": 24
+          },
+          {
+            "path": "build/lib/roostoo_bot/strategy.py",
+            "line": 23
+          },
+          {
+            "path": "build/lib/roostoo_bot/strategy.py",
+            "line": 51
+          },
+          {
+            "path": "execution/portfolio.py",
+            "line": 181
+          },
+          {
+            "path": "main.py",
+            "line": 115
+          },
+          {
+            "path": "scripts/backtest_sol.py",
+            "line": 138
+          },
+          {
+            "path": "sizing.py",
+            "line": 9
+          },
+          {
+            "path": "sizing.py",
+            "line": 24
+          },
+          {
+            "path": "sizing.py",
+            "line": 24
+          },
+          {
+            "path": "strategy.py",
+            "line": 23
+          },
+          {
+            "path": "strategy.py",
+            "line": 51
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "MAX_PORTFOLIO_EXPOSURE",
+        "value": 0.7,
+        "source": {
+          "path": "config.py",
+          "line": 118
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/execution/portfolio.py",
+            "line": 181
+          },
+          {
+            "path": "build/lib/roostoo_bot/main.py",
+            "line": 116
+          },
+          {
+            "path": "build/lib/roostoo_bot/sizing.py",
+            "line": 21
+          },
+          {
+            "path": "execution/portfolio.py",
+            "line": 181
+          },
+          {
+            "path": "main.py",
+            "line": 116
+          },
+          {
+            "path": "sizing.py",
+            "line": 21
+          }
+        ],
+        "assessment": "Signed gross cap integrated with per-asset caps into runner order planning."
+      },
+      {
+        "parameter": "MAX_TRADES_PER_HOUR",
+        "value": 20,
+        "source": {
+          "path": "config.py",
+          "line": 119
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/execution/portfolio.py",
+            "line": 79
+          },
+          {
+            "path": "execution/portfolio.py",
+            "line": 79
+          }
+        ],
+        "assessment": "Hourly attempt reservations enforced and persisted across restarts."
+      },
+      {
+        "parameter": "MAX_DRAWDOWN_KILL_SWITCH",
+        "value": 0.12,
+        "source": {
+          "path": "config.py",
+          "line": 120
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/execution/portfolio.py",
+            "line": 74
+          },
+          {
+            "path": "execution/portfolio.py",
+            "line": 74
+          }
+        ],
+        "assessment": "High-water equity halt enforced and latched in persisted runner state."
+      },
+      {
+        "parameter": "MIN_CONFIDENCE_TO_TRADE",
+        "value": 0.55,
+        "source": {
+          "path": "config.py",
+          "line": 121
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/sizing.py",
+            "line": 8
+          },
+          {
+            "path": "build/lib/roostoo_bot/strategy.py",
+            "line": 41
+          },
+          {
+            "path": "sizing.py",
+            "line": 8
+          },
+          {
+            "path": "strategy.py",
+            "line": 41
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "SIZING_REFERENCE_VOL",
+        "value": 0.0006,
+        "source": {
+          "path": "config.py",
+          "line": 126
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/sizing.py",
+            "line": 16
+          },
+          {
+            "path": "sizing.py",
+            "line": 16
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "COMPONENTS",
+        "value": {
+          "momentum": true,
+          "mean_reversion": true,
+          "cross_sectional": true,
+          "regime": true,
+          "ml_model": true,
+          "cost_filter": true,
+          "position_sizing": true
+        },
+        "source": {
+          "path": "config.py",
+          "line": 129
+        },
+        "references": [
+          {
+            "path": "backtest/ablation.py",
+            "line": 18
+          },
+          {
+            "path": "backtest/ablation.py",
+            "line": 60
+          },
+          {
+            "path": "backtest/ablation.py",
+            "line": 66
+          },
+          {
+            "path": "backtest/ablation.py",
+            "line": 68
+          },
+          {
+            "path": "backtest/ablation.py",
+            "line": 69
+          },
+          {
+            "path": "build/lib/roostoo_bot/backtest/ablation.py",
+            "line": 18
+          },
+          {
+            "path": "build/lib/roostoo_bot/backtest/ablation.py",
+            "line": 60
+          },
+          {
+            "path": "build/lib/roostoo_bot/backtest/ablation.py",
+            "line": 66
+          },
+          {
+            "path": "build/lib/roostoo_bot/backtest/ablation.py",
+            "line": 68
+          },
+          {
+            "path": "build/lib/roostoo_bot/backtest/ablation.py",
+            "line": 69
+          },
+          {
+            "path": "build/lib/roostoo_bot/features/build_features.py",
+            "line": 38
+          },
+          {
+            "path": "build/lib/roostoo_bot/main.py",
+            "line": 199
+          },
+          {
+            "path": "build/lib/roostoo_bot/main.py",
+            "line": 86
+          },
+          {
+            "path": "build/lib/roostoo_bot/model/train.py",
+            "line": 36
+          },
+          {
+            "path": "build/lib/roostoo_bot/strategy.py",
+            "line": 27
+          },
+          {
+            "path": "features/build_features.py",
+            "line": 38
+          },
+          {
+            "path": "main.py",
+            "line": 199
+          },
+          {
+            "path": "main.py",
+            "line": 86
+          },
+          {
+            "path": "model/train.py",
+            "line": 36
+          },
+          {
+            "path": "strategy.py",
+            "line": 27
+          },
+          {
+            "path": "tests/test_regressions.py",
+            "line": 91
+          },
+          {
+            "path": "tests/test_regressions.py",
+            "line": 364
+          },
+          {
+            "path": "tests/test_regressions.py",
+            "line": 371
+          }
+        ],
+        "assessment": "Feature/model/cost/sizing switches respected; hard risk guards always remain active."
+      },
+      {
+        "parameter": "WALKFORWARD_TRAIN_BARS",
+        "value": 2000,
+        "source": {
+          "path": "config.py",
+          "line": 140
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/model/train.py",
+            "line": 47
+          },
+          {
+            "path": "build/lib/roostoo_bot/scripts/backtest_sol.py",
+            "line": 100
+          },
+          {
+            "path": "model/train.py",
+            "line": 47
+          },
+          {
+            "path": "scripts/backtest_sol.py",
+            "line": 100
+          }
+        ],
+        "assessment": "Used by offline trainer; explicit model artifacts loaded at runner startup, no autonomous retraining."
+      },
+      {
+        "parameter": "WALKFORWARD_VAL_BARS",
+        "value": 500,
+        "source": {
+          "path": "config.py",
+          "line": 141
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/model/train.py",
+            "line": 48
+          },
+          {
+            "path": "build/lib/roostoo_bot/scripts/backtest_sol.py",
+            "line": 102
+          },
+          {
+            "path": "model/train.py",
+            "line": 48
+          },
+          {
+            "path": "scripts/backtest_sol.py",
+            "line": 102
+          }
+        ],
+        "assessment": "Used by purged offline validation; economic evaluation separately uses paired common timestamps."
+      },
+      {
+        "parameter": "WALKFORWARD_STEP_BARS",
+        "value": 500,
+        "source": {
+          "path": "config.py",
+          "line": 142
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/model/train.py",
+            "line": 49
+          },
+          {
+            "path": "build/lib/roostoo_bot/scripts/backtest_sol.py",
+            "line": 102
+          },
+          {
+            "path": "model/train.py",
+            "line": 49
+          },
+          {
+            "path": "scripts/backtest_sol.py",
+            "line": 102
+          }
+        ],
+        "assessment": "Used by purged rolling validation; final historical holdout remains to be frozen."
+      },
+      {
+        "parameter": "RANDOM_SEED",
+        "value": 42,
+        "source": {
+          "path": "config.py",
+          "line": 144
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/model/train.py",
+            "line": 23
+          },
+          {
+            "path": "build/lib/roostoo_bot/model/train.py",
+            "line": 24
+          },
+          {
+            "path": "build/lib/roostoo_bot/model/train.py",
+            "line": 28
+          },
+          {
+            "path": "build/lib/roostoo_bot/model/train.py",
+            "line": 22
+          },
+          {
+            "path": "model/train.py",
+            "line": 23
+          },
+          {
+            "path": "model/train.py",
+            "line": 24
+          },
+          {
+            "path": "model/train.py",
+            "line": 28
+          },
+          {
+            "path": "model/train.py",
+            "line": 22
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "LIVE_TRADING_ENABLED",
+        "value": false,
+        "source": {
+          "path": "config.py",
+          "line": 147
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/execution/broker.py",
+            "line": 13
+          },
+          {
+            "path": "build/lib/roostoo_bot/execution/broker.py",
+            "line": 51
+          },
+          {
+            "path": "build/lib/roostoo_bot/main.py",
+            "line": 34
+          },
+          {
+            "path": "execution/broker.py",
+            "line": 13
+          },
+          {
+            "path": "execution/broker.py",
+            "line": 51
+          },
+          {
+            "path": "main.py",
+            "line": 34
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "ALLOW_SHORTS",
+        "value": false,
+        "source": {
+          "path": "config.py",
+          "line": 148
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/execution/broker.py",
+            "line": 62
+          },
+          {
+            "path": "build/lib/roostoo_bot/main.py",
+            "line": 88
+          },
+          {
+            "path": "build/lib/roostoo_bot/main.py",
+            "line": 82
+          },
+          {
+            "path": "execution/broker.py",
+            "line": 62
+          },
+          {
+            "path": "main.py",
+            "line": 88
+          },
+          {
+            "path": "main.py",
+            "line": 82
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "MAX_QUOTE_AGE_MS",
+        "value": 120000,
+        "source": {
+          "path": "config.py",
+          "line": 149
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/data/validation.py",
+            "line": 31
+          },
+          {
+            "path": "build/lib/roostoo_bot/features/build_features.py",
+            "line": 33
+          },
+          {
+            "path": "build/lib/roostoo_bot/main.py",
+            "line": 57
+          },
+          {
+            "path": "build/lib/roostoo_bot/scripts/backtest_sol.py",
+            "line": 96
+          },
+          {
+            "path": "data/validation.py",
+            "line": 31
+          },
+          {
+            "path": "features/build_features.py",
+            "line": 33
+          },
+          {
+            "path": "main.py",
+            "line": 57
+          },
+          {
+            "path": "scripts/backtest_sol.py",
+            "line": 96
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "MAX_HISTORY_GAP_MS",
+        "value": 120000,
+        "source": {
+          "path": "config.py",
+          "line": 150
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/data/validation.py",
+            "line": 33
+          },
+          {
+            "path": "build/lib/roostoo_bot/model/train.py",
+            "line": 195
+          },
+          {
+            "path": "build/lib/roostoo_bot/scripts/backtest_sol.py",
+            "line": 96
+          },
+          {
+            "path": "data/validation.py",
+            "line": 33
+          },
+          {
+            "path": "model/train.py",
+            "line": 195
+          },
+          {
+            "path": "scripts/backtest_sol.py",
+            "line": 96
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "MIN_REBALANCE_FRACTION",
+        "value": 0.002,
+        "source": {
+          "path": "config.py",
+          "line": 151
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/execution/portfolio.py",
+            "line": 182
+          },
+          {
+            "path": "execution/portfolio.py",
+            "line": 182
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "SHORT_FEE",
+        "value": 0.001,
+        "source": {
+          "path": "config.py",
+          "line": 152
+        },
+        "references": [
+          {
+            "path": "backtest/engine.py",
+            "line": 63
+          },
+          {
+            "path": "build/lib/roostoo_bot/backtest/engine.py",
+            "line": 63
+          },
+          {
+            "path": "build/lib/roostoo_bot/costs.py",
+            "line": 13
+          },
+          {
+            "path": "build/lib/roostoo_bot/execution/portfolio.py",
+            "line": 103
+          },
+          {
+            "path": "build/lib/roostoo_bot/execution/portfolio.py",
+            "line": 163
+          },
+          {
+            "path": "build/lib/roostoo_bot/main.py",
+            "line": 120
+          },
+          {
+            "path": "costs.py",
+            "line": 13
+          },
+          {
+            "path": "execution/portfolio.py",
+            "line": 103
+          },
+          {
+            "path": "execution/portfolio.py",
+            "line": 163
+          },
+          {
+            "path": "main.py",
+            "line": 120
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "MAX_API_CALLS_PER_MINUTE",
+        "value": 30,
+        "source": {
+          "path": "config.py",
+          "line": 153
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/execution/trader.py",
+            "line": 25
+          },
+          {
+            "path": "build/lib/roostoo_bot/execution/trader.py",
+            "line": 34
+          },
+          {
+            "path": "execution/trader.py",
+            "line": 25
+          },
+          {
+            "path": "execution/trader.py",
+            "line": 34
+          },
+          {
+            "path": "tests/test_regressions.py",
+            "line": 497
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "CROSS_SECTIONAL_HORIZON",
+        "value": 5,
+        "source": {
+          "path": "config.py",
+          "line": 154
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/features/cross_sectional.py",
+            "line": 22
+          },
+          {
+            "path": "features/cross_sectional.py",
+            "line": 22
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "MEAN_REVERSION_THRESHOLD",
+        "value": 1.5,
+        "source": {
+          "path": "config.py",
+          "line": 155
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/strategy.py",
+            "line": 12
+          },
+          {
+            "path": "build/lib/roostoo_bot/strategy.py",
+            "line": 12
+          },
+          {
+            "path": "strategy.py",
+            "line": 12
+          },
+          {
+            "path": "strategy.py",
+            "line": 12
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "CROSS_SECTIONAL_LONG_PERCENTILE",
+        "value": 0.7,
+        "source": {
+          "path": "config.py",
+          "line": 156
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/strategy.py",
+            "line": 15
+          },
+          {
+            "path": "strategy.py",
+            "line": 15
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "CROSS_SECTIONAL_SHORT_PERCENTILE",
+        "value": 0.3,
+        "source": {
+          "path": "config.py",
+          "line": 157
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/strategy.py",
+            "line": 15
+          },
+          {
+            "path": "strategy.py",
+            "line": 15
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "MODEL_DIR",
+        "value": "models",
+        "source": {
+          "path": "config.py",
+          "line": 158
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/main.py",
+            "line": 185
+          },
+          {
+            "path": "main.py",
+            "line": 185
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "PAPER_STATE_PATH",
+        "value": "data_store/paper_state.json",
+        "source": {
+          "path": "config.py",
+          "line": 159
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/main.py",
+            "line": 186
+          },
+          {
+            "path": "main.py",
+            "line": 186
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      },
+      {
+        "parameter": "EVENT_LOG_PATH",
+        "value": "logs/events.jsonl",
+        "source": {
+          "path": "config.py",
+          "line": 160
+        },
+        "references": [
+          {
+            "path": "build/lib/roostoo_bot/main.py",
+            "line": 187
+          },
+          {
+            "path": "main.py",
+            "line": 187
+          }
+        ],
+        "assessment": "Referenced by the repaired implementation; historical effectiveness and tuning remain unvalidated."
+      }
+    ],
+    "strategy_rule_parameters": [
+      {
+        "parameter": "cross-sectional return horizon",
+        "value": 5,
+        "file": "config.py"
+      },
+      {
+        "parameter": "momentum baseline sign threshold",
+        "value": 0.0,
+        "file": "strategy.py"
+      },
+      {
+        "parameter": "mean-reversion baseline z threshold",
+        "value": 1.5,
+        "file": "config.py"
+      },
+      {
+        "parameter": "cross-sectional long/short percentiles",
+        "value": [
+          0.7,
+          0.3
+        ],
+        "file": "config.py"
+      },
+      {
+        "parameter": "reference volatility for sizing",
+        "value": 0.01,
+        "file": "config.py"
+      }
+    ],
+    "priorities": [
+      "Freeze chronological historical train/validation/final-test datasets; label masking and purging now covered by fixtures.",
+      "Reconcile repaired research metric conventions and cost assumptions with organizer/account sources.",
+      "Exercise shared targets and reconciled delta execution against sustained paper/sandbox observations.",
+      "Select/test additional concentration and daily-loss policies if required; integrated hard caps are fixture-tested.",
+      "Measure probability/conditional-payoff stability and out-of-sample economic performance on real data.",
+      "Run repaired paired component comparisons with frozen settings and realistic measured/stressed costs.",
+      "Run historical multi-regime, multi-asset parameter/cost/delay stress tests and paper accounting before deciding which 2\u20134 strategy families to retain."
+    ],
+    "unverified": [
+      "Historical profitability: no market dataset, saved trained model or backtest results committed.",
+      "Venue fees, minimum order sizes, symbols, short mechanics, rate limits and exact competition scoring conventions.",
+      "Actual venue behavior of the new live adapter; all current execution evidence is mocked or paper."
+    ]
+  }
+}

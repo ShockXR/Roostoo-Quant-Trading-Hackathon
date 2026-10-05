@@ -52,7 +52,8 @@ cd roostoo_bot_repo
 
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements.txt  # includes editable package installation
+python -m unittest discover -s tests -t . -v
 
 mkdir -p logs data_store
 
@@ -105,10 +106,10 @@ one-off manual script hitting `place_order` directly.
 
 ## Part 6 — Before going fully live
 
-1. **Run with `DRY_RUN = True` first** (default in `main.py`) for at least a
+1. **Read README.md and create historical trained-model artifacts first.** Startup deliberately fails without a model. **Run with `DRY_RUN = True`** (default in `main.py`) for at least a
    few hours after deployment — watch `logs/bot.log` and confirm the
-   decisions it *would* make look sane before flipping it to live orders.
-2. Confirm `MIN_ORDER` behavior from `scripts/test_min_order.py` before
+   decisions it *would* make look sane and reconcile its paper ledger and fill assumptions. `LIVE_TRADING_ENABLED` is also false; live enablement requires a separate review.
+2. Inspect `MiniOrder` and amount precision with the now read-only `scripts/test_min_order.py` before
    relying on any sizing math near the minimum.
 3. Set up a simple daily check-in (even just SSH-ing in and reading the
    last day of logs) — "24/7 autonomous" doesn't mean "unmonitored,"

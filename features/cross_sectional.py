@@ -13,16 +13,18 @@ from .. import config
 
 def build_cross_sectional_features(
     price_panel: pd.DataFrame,
-    ret_horizon: int = 5,
+    ret_horizon: int | None = None,
 ) -> dict[str, pd.DataFrame]:
     """
     price_panel: wide DataFrame, index = timestamp, columns = pair, values = last_price.
     Returns dict[pair] -> DataFrame of cross-sectional features aligned to price_panel.index.
     """
-    returns = price_panel.pct_change(ret_horizon)
+    ret_horizon = config.CROSS_SECTIONAL_HORIZON if ret_horizon is None else ret_horizon
+    returns = price_panel.pct_change(ret_horizon, fill_method=None)
 
     cs_mean = returns.mean(axis=1)
     market_ret = returns[config.MARKET_PROXY] if config.MARKET_PROXY in returns.columns else cs_mean
+    complete = returns.notna().all(axis=1)
 
     out = {}
     for pair in price_panel.columns:
@@ -35,5 +37,5 @@ def build_cross_sectional_features(
         # cross-sectional dispersion at this timestamp: how spread out are
         # returns across the universe right now (a regime-ish signal too)
         feat["cs_dispersion"] = returns.std(axis=1)
-        out[pair] = feat
+        out[pair] = feat.where(complete)
     return out

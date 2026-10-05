@@ -34,6 +34,7 @@ def poll_once():
             "coin_trade_value": info.get("CoinTradeValue"),
             "unit_trade_value": info.get("UnitTradeValue"),
         })
+    return int(server_time)
 
 
 def run_forever(interval: int = config.POLL_INTERVAL_SECONDS):

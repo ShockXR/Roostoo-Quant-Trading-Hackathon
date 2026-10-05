@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "roostoo-bot"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["requests>=2.31", "pandas>=2.0", "numpy>=1.24", "scikit-learn>=1.3", "pyarrow>=14", "python-dotenv>=1.0", "joblib>=1.3", "python-dateutil>=2.8"]
+
+[tool.setuptools]
+packages = ["roostoo_bot", "roostoo_bot.backtest", "roostoo_bot.data", "roostoo_bot.execution", "roostoo_bot.features", "roostoo_bot.model", "roostoo_bot.scripts"]
+package-dir = {roostoo_bot = "."}
