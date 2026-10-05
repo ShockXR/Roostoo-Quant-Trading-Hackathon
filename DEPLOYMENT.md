@@ -47,8 +47,8 @@ rather than being hand-operated.
 ```bash
 sudo apt update && sudo apt install -y python3-venv python3-pip git
 
-git clone https://github.com/<your-username>/roostoo-trading-bot.git roostoo_bot_repo
-cd roostoo_bot_repo
+git clone https://github.com/<your-username>/roostoo-trading-bot.git roostoo_bot
+cd roostoo_bot
 
 python3 -m venv .venv
 source .venv/bin/activate
@@ -93,7 +93,7 @@ git commit -m "tune: adjust MIN_CONFIDENCE_TO_TRADE based on week-1 results"
 git push
 
 # on the AWS instance:
-cd roostoo_bot_repo
+cd ~/roostoo_bot
 git pull
 sudo systemctl restart roostoo-bot
 ```
