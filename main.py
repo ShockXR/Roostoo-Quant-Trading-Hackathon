@@ -10,24 +10,33 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 try:
-    import config
-    import costs
-    import sizing
-    import strategy
+    import config, costs, sizing, strategy
     from data.collector import poll_once
     from data.store import load_all
-    from execution.trader import place_order
+    from execution.trader import place_order, log_trade_to_csv
 except ImportError:
     from . import config, costs, sizing, strategy
     from .data.collector import poll_once
     from .data.store import load_all
-    from .execution.trader import place_order
+    from .execution.trader import place_order, log_trade_to_csv
 
 log = logging.getLogger("main")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 
-DRY_RUN = True  # Set to False when ready to place live orders on Roostoo
-SELECTED_STRATEGY = "reversal"  # Options: 'reversal', 'buy_hold', etc.
+# Global dry-run fallback flag
+DRY_RUN = False  
+
+# Live Trading White-list: Coins listed here place REAL live orders on Roostoo exchange.
+LIVE_PAIRS = [
+    "BTC/USD", 
+    "ETH/USD", 
+    "SOL/USD", 
+    "BNB/USD", 
+    "XRP/USD", 
+    "ADA/USD"
+]
+
+SELECTED_STRATEGY = "reversal"  # Options: 'reversal', 'momentum', 'mean_reversion', 'buy_hold'
 
 
 def run_once():
@@ -63,10 +72,13 @@ def run_once():
 
         log.info("%s: STRATEGY SIGNAL TRIGGERED (%s) target_weight=%.4f", pair, SELECTED_STRATEGY, latest_signal)
 
-        if not DRY_RUN:
+        # Per-coin Live vs Paper-trade logic:
+        if not DRY_RUN and (pair in LIVE_PAIRS or "ALL" in LIVE_PAIRS):
+            log.info("🚀 [LIVE ORDER] Executing REAL order on Roostoo for %s with size=%.4f", pair, latest_signal)
             place_order(pair, "BUY", quantity=latest_signal)
         else:
-            log.info("[DRY RUN] Would place BUY order for %s with size=%.4f", pair, latest_signal)
+            log.info("📝 [PAPER TRADE / DRY RUN] Simulated BUY order for %s with size=%.4f", pair, latest_signal)
+            log_trade_to_csv(pair, "BUY", quantity=latest_signal, execution_type="PAPER_TRADE")
 
 
 def run_forever(interval: int = config.POLL_INTERVAL_SECONDS):
