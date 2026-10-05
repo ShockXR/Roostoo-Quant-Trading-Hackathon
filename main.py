@@ -44,7 +44,7 @@ def run_once():
             continue
 
         df = raw[pair]
-        min_bars_needed = max(config.REVERSAL_LOOKBACK_BARS, config.REVERSAL_HOLD_BARS)
+        min_bars_needed = int(getattr(config, "MIN_BARS_TO_TRADE", 60))
         if len(df) < min_bars_needed:
             log.info("%s: accumulating price history (%d/%d bars)", pair, len(df), min_bars_needed)
             continue
