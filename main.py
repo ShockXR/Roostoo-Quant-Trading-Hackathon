@@ -56,7 +56,7 @@ class TradingEngine:
                 out.write(json.dumps({"timestamp": now_ms, "equity": equity, "mode": mode}, allow_nan=False) + "\n")
 
     def step(self, raw, now_ms):
-        if self.state.uncertain:
+        if self.state.uncertain and not isinstance(self.broker, LiveBroker):
             raise UnknownOrderState("previous order state is uncertain; reconcile before resuming")
         quotes = {}
         for pair, frame in raw.items():
@@ -69,7 +69,15 @@ class TradingEngine:
             quotes[pair] = Quote(float(row.last_price), float(row.max_bid), float(row.min_ask), int(row.timestamp))
         if not quotes:
             return []
-        snapshot = self.broker.snapshot(quotes)
+        snapshot = self.broker.snapshot(quotes)  # live: raises while orders are pending or balances locked
+        if self.state.uncertain:
+            # Live holdings are re-read from the exchange every cycle. With no
+            # pending orders or locked balances the wallet already reflects the
+            # ambiguous order, so planning from it cannot double-count. Clearing
+            # here keeps the bot autonomous; manual intervention is prohibited.
+            self.state.uncertain = False
+            log.warning("uncertain order reconciled against exchange balances")
+            self.persist()
         equity = snapshot.equity(quotes)
         self.state.mark(equity)
         self.log_equity(now_ms, equity)

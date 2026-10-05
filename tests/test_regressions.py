@@ -457,6 +457,41 @@ class ExecutionTests(OfflineCase):
                 self.assertFalse(runner.state.uncertain)
                 self.assertEqual(runner.state.trades, [])
 
+    def live_runner(self, state=None):
+        broker = LiveBroker()
+        return TradingEngine(broker, metadata(self.raw), {p: bundle(pair=p) for p in self.raw}, state=state)
+
+    def test_live_uncertain_order_clears_after_clean_reconciliation(self):
+        with patch.object(config, "LIVE_TRADING_ENABLED", True), patch("roostoo_bot.main.DRY_RUN", False):
+            runner = self.live_runner(ExecutionState(uncertain=True))
+            with patch.object(runner.broker, "snapshot", return_value=Snapshot(100_000.)), \
+                 patch.object(runner.broker, "can_submit", return_value=False):
+                runner.step(self.raw, self.now)
+            self.assertFalse(runner.state.uncertain)
+
+    def test_live_uncertain_order_stays_while_exchange_has_pending_orders(self):
+        with patch.object(config, "LIVE_TRADING_ENABLED", True), patch("roostoo_bot.main.DRY_RUN", False):
+            runner = self.live_runner(ExecutionState(uncertain=True))
+            with patch.object(runner.broker, "snapshot", side_effect=UnknownOrderState("pending")), \
+                 patch.object(runner.broker, "submit") as submit:
+                with self.assertRaises(UnknownOrderState):
+                    runner.step(self.raw, self.now)
+                submit.assert_not_called()
+            self.assertTrue(runner.state.uncertain)
+
+    def test_live_wallet_ignores_negative_rounding_dust_only(self):
+        quotes = {"BTC/USD": Quote(100., 99.9, 100.1, self.now)}
+        def wallet(btc):
+            return {"Success": True, "Wallet": {"USD": {"Free": 1000., "Lock": 0.}, "BTC": {"Free": btc, "Lock": 0.}}}
+        with patch.object(config, "LIVE_TRADING_ENABLED", True), \
+             patch.object(trader, "get_pending_count", return_value={"Success": False, "TotalPending": 0}), \
+             patch.object(trader, "get_short_positions", return_value={"Success": True, "Positions": []}):
+            with patch.object(trader, "get_balance", return_value=wallet(-.001)):
+                self.assertEqual(LiveBroker().snapshot(quotes).longs, {})
+            with patch.object(trader, "get_balance", return_value=wallet(-1.)):
+                with self.assertRaises(UnknownOrderState):
+                    LiveBroker().snapshot(quotes)
+
     def test_invalid_reconciled_holdings_rejected(self):
         with self.assertRaises(ValueError):
             Snapshot(1000., {"BTC/USD": -1.})

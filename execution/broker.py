@@ -35,8 +35,13 @@ class LiveBroker:
             if coin == "USD":
                 continue
             quantity = float(amounts.get("Free", 0))
+            pair = coin + "/USD"
+            if quantity < 0:
+                # FAQ Q24: sells can leave tiny negative rounding residue; ignore it below the venue minimum.
+                if pair in quotes and -quantity * quotes[pair].price < 1.:
+                    continue
+                raise UnknownOrderState("negative balance requires reconciliation")
             if quantity:
-                pair = coin + "/USD"
                 if pair not in quotes:
                     raise UnknownOrderState("held asset missing from quoted universe")
                 longs[pair] = quantity
