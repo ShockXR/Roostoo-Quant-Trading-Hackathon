@@ -158,3 +158,5 @@ CROSS_SECTIONAL_SHORT_PERCENTILE = 0.3
 MODEL_DIR = "models"
 PAPER_STATE_PATH = "data_store/paper_state.json"
 EVENT_LOG_PATH = "logs/events.jsonl"
+EQUITY_LOG_PATH = "logs/equity.jsonl"
+COMPETITION_START_MS = 1_791_072_000_000  # 2026-10-04 00:00 UTC; live trading Oct 4-17

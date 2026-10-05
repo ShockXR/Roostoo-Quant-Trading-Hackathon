@@ -3,6 +3,7 @@ import math
 import numpy as np
 import pandas as pd
 from .. import config, sizing
+from ..scoring import score_equity
 from ..execution.portfolio import PaperBroker, Quote, Order
 
 
@@ -93,6 +94,16 @@ def _calmar_ratio(total_return, max_drawdown, years):
     return result if math.isfinite(result) else None
 
 
+def _daily_score(sim_result):
+    """Competition-style score on daily closes; needs a UTC epoch-ms index."""
+    keys = ("daily_composite", "daily_sortino", "daily_sharpe", "daily_calmar", "n_days")
+    index = sim_result.index
+    if not pd.api.types.is_integer_dtype(index) or index.min() < 10 ** 12:
+        return dict.fromkeys(keys)  # bar counters, not timestamps
+    report = score_equity(sim_result.equity * config.INITIAL_CAPITAL, config.INITIAL_CAPITAL)
+    return dict(zip(keys, (report.composite, report.sortino, report.sharpe, report.calmar, report.n_days)))
+
+
 def summarize(sim_result, periods_per_year=None, bars_per_year=None):
     annual = config.BARS_PER_YEAR if periods_per_year is None else periods_per_year
     if annual <= 0:
@@ -108,7 +119,8 @@ def summarize(sim_result, periods_per_year=None, bars_per_year=None):
     sortino = _sortino_ratio(net, annual)
     calmar = _calmar_ratio(total, max_dd, years)
     composite = .4 * sortino + .3 * sharpe + .3 * calmar if calmar is not None else None
-    return {"total_net_return": total, "sharpe_like": sharpe, "sortino_like": sortino, "calmar_like": calmar,
+    daily = _daily_score(sim_result)
+    return {**daily, "total_net_return": total, "sharpe_like": sharpe, "sortino_like": sortino, "calmar_like": calmar,
             "composite_score": composite, "metric_convention": "zero-target RMS downside; undefined/no-downside ratios use 0; overflow annualization uses null; organizer parity unverified",
             "max_drawdown": max_dd, "avg_turnover": float(sim_result.turnover.mean()),
             "n_fills": int(sim_result.n_fills.sum()), "total_fees": float(sim_result.fees.sum()),

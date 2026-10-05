@@ -30,13 +30,14 @@ def atomic_json(path, payload):
 
 
 class TradingEngine:
-    def __init__(self, broker, metadata, models=None, strategy="model", state=None, state_path=None, event_path=None):
+    def __init__(self, broker, metadata, models=None, strategy="model", state=None, state_path=None, event_path=None,
+                 equity_path=None):
         if isinstance(broker, LiveBroker) and (DRY_RUN or not config.LIVE_TRADING_ENABLED):
             raise RuntimeError("live trading disabled")
         self.broker, self.metadata = broker, metadata
         self.models, self.strategy = models or {}, strategy
         self.state = state or ExecutionState()
-        self.state_path, self.event_path = state_path, event_path
+        self.state_path, self.event_path, self.equity_path = state_path, event_path, equity_path
 
     def persist(self):
         if self.state_path:
@@ -44,6 +45,15 @@ class TradingEngine:
             if isinstance(self.broker, PaperBroker):
                 value["portfolio"] = asdict(self.broker.state)
             atomic_json(self.state_path, value)
+
+    def log_equity(self, now_ms, equity):
+        # One mark per cycle; scripts/live_score.py turns these into the daily composite score.
+        if self.equity_path:
+            path = Path(self.equity_path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            mode = "paper" if isinstance(self.broker, PaperBroker) else "live"
+            with path.open("a") as out:
+                out.write(json.dumps({"timestamp": now_ms, "equity": equity, "mode": mode}, allow_nan=False) + "\n")
 
     def step(self, raw, now_ms):
         if self.state.uncertain:
@@ -60,7 +70,9 @@ class TradingEngine:
         if not quotes:
             return []
         snapshot = self.broker.snapshot(quotes)
-        self.state.mark(snapshot.equity(quotes))
+        equity = snapshot.equity(quotes)
+        self.state.mark(equity)
+        self.log_equity(now_ms, equity)
         panel = build_price_panel(raw)
         lookback = max(max(config.MOMENTUM_HORIZONS) + 1, 2 * config.MA_WINDOWS["slow"],
                        config.MEAN_REV_WINDOW + 1, 2 * config.REGIME_VOL_WINDOW + 1, config.REGIME_TREND_WINDOW + 1)
@@ -147,7 +159,7 @@ class TradingEngine:
         return events
 
 
-def restore_engine(broker, metadata, models, state_path, event_path, strategy="model"):
+def restore_engine(broker, metadata, models, state_path, event_path, strategy="model", equity_path=None):
     state = ExecutionState()
     path = Path(state_path)
     if path.exists():
@@ -159,7 +171,7 @@ def restore_engine(broker, metadata, models, state_path, event_path, strategy="m
         if isinstance(broker, PaperBroker):
             portfolio = saved["portfolio"]
             broker.state = Snapshot(portfolio["cash"], portfolio["longs"], {p: Short(**s) for p, s in portfolio["shorts"].items()})
-    return TradingEngine(broker, metadata, models, strategy, state, state_path, event_path)
+    return TradingEngine(broker, metadata, models, strategy, state, state_path, event_path, equity_path)
 
 
 def run_once(engine):
@@ -185,6 +197,7 @@ def main():
     parser.add_argument("--model-dir", default=config.MODEL_DIR)
     parser.add_argument("--state", default=config.PAPER_STATE_PATH)
     parser.add_argument("--events", default=config.EVENT_LOG_PATH)
+    parser.add_argument("--equity", default=config.EQUITY_LOG_PATH)
     parser.add_argument("--strategy", choices=["model", "momentum", "mean_reversion", "cross_sectional"], default="model")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
@@ -202,7 +215,7 @@ def main():
     if not info or not info.get("IsRunning"):
         parser.error("exchange metadata unavailable/not running")
     broker = PaperBroker() if DRY_RUN else LiveBroker()
-    engine = restore_engine(broker, info["TradePairs"], models, args.state, args.events, args.strategy)
+    engine = restore_engine(broker, info["TradePairs"], models, args.state, args.events, args.strategy, args.equity)
     log.info("Starting %s mode with %s model artifacts", "paper" if DRY_RUN else "live", len(models))
     run_forever(engine)
 
