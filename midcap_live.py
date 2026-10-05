@@ -31,6 +31,7 @@ class RebalanceState:
     scale: float = 1.          # drawdown multiplier currently applied
     done: bool = True
     cycles: int = 0            # cycles spent trying to reach the current targets
+    rejections: dict = field(default_factory=dict)  # pair -> times the exchange refused its order
 
 
 def latest_rebalance_hour(now_ms, every_hours, delay_ms):
@@ -88,12 +89,13 @@ class MidcapEngine(TradingEngine):
             log.info("rebalance %s scale=%.2f weights=%s", hour, scale, {p: round(w, 4) for p, w in weights.items() if w})
         elif scale < r.scale:
             log.warning("drawdown de-risk: scale %.2f -> %.2f", r.scale, scale)
-            r.scale, r.done, r.cycles = scale, False, 0
+            r.scale, r.done, r.cycles, r.rejections = scale, False, 0, {}
         if r.done:
             self.persist()
             return []
         targets = {p: r.weights.get(p, 0.) * r.scale for p in self.pairs}
         orders = plan_orders(targets, snapshot, quotes, self.metadata, min_fraction=config.MIDCAP_REBALANCE_BAND)
+        orders = [o for o in orders if r.rejections.get(o.pair, 0) < config.MIDCAP_MAX_REJECTIONS_PER_PAIR]
         r.cycles += 1
         if not orders or r.cycles > config.MIDCAP_MAX_REBALANCE_CYCLES:
             if orders:
@@ -102,8 +104,11 @@ class MidcapEngine(TradingEngine):
             self.persist()
             return []
         events = self.submit_orders(orders, targets, quotes, now_ms)
+        for pair in self.rejected:
+            r.rejections[pair] = r.rejections.get(pair, 0) + 1
         # Trade once per rebalance, as in the backtest: done when every planned order
-        # filled. Orders held back by rate, cash or exposure limits retry next cycle.
+        # filled. Orders held back by rate, cash or exposure limits retry next cycle;
+        # a pair the exchange keeps refusing is given up on for this rebalance.
         if len(events) == len(orders):
             r.done = True
             self.persist()

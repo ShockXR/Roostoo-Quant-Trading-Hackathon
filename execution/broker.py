@@ -8,6 +8,10 @@ class UnknownOrderState(RuntimeError):
     pass
 
 
+class OrderRejected(RuntimeError):
+    """The exchange answered Success=false: nothing was placed or filled."""
+
+
 class LiveBroker:
     def __init__(self):
         if not config.LIVE_TRADING_ENABLED:
@@ -85,6 +89,9 @@ class LiveBroker:
                         "status": "FILLED", "paper": False}
         else:
             raise ValueError("unknown action")
-        # Partial fills, rejection, missing fields and timeouts all end the
-        # cycle. Never update a local ledger by assuming the requested fill.
+        if isinstance(response, dict) and response.get("Success") is False:
+            # A definitive refusal (bad size, pair not tradable, no short permission...).
+            raise OrderRejected(str(response.get("ErrMsg", "order rejected")))
+        # Partial fills, missing fields and timeouts end the cycle. Never update a
+        # local ledger by assuming the requested fill.
         raise UnknownOrderState("order not fully confirmed; reconcile before further orders")

@@ -170,6 +170,7 @@ MIDCAP_TARGET_DAILY_VOL = 0.015   # team decision 2026-10-05
 MIDCAP_REBALANCE_EVERY_HOURS = 24  # rebalance at 00:00 UTC
 MIDCAP_REBALANCE_DELAY_MS = 120_000  # wait for the hourly kline to close on Binance
 MIDCAP_REBALANCE_BAND = 0.01       # skip per-coin trades under 1% of equity (as in the backtest)
+MIDCAP_MAX_REJECTIONS_PER_PAIR = 2   # stop retrying a pair the exchange refuses this often per rebalance
 MIDCAP_MAX_REBALANCE_CYCLES = 15   # give up on a rebalance that cannot finish (e.g. repeated rejections)
 # Staged drawdown de-risk from the equity high-water mark: half size beyond 3%, 30% beyond 6%.
 # Never zero, so the bot keeps trading; size returns at the next daily rebalance once drawdown recovers.

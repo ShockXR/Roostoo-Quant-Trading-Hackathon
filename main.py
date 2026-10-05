@@ -11,7 +11,7 @@ from .data.collector import poll_once
 from .data.store import load_all
 from .data.validation import validate_recent_history
 from .execution.portfolio import PaperBroker, Quote, ExecutionState, Snapshot, Short, plan_orders
-from .execution.broker import LiveBroker, UnknownOrderState
+from .execution.broker import LiveBroker, OrderRejected, UnknownOrderState
 from .execution.trader import get_exchange_info
 from .features.build_features import build_features_for_pair, build_price_panel
 from .model.train import load_bundle
@@ -31,6 +31,7 @@ def atomic_json(path, payload):
 
 class TradingEngine:
     kill_switch = None  # drawdown fraction that latches a halt; None uses config.MAX_DRAWDOWN_KILL_SWITCH
+    rejected = ()       # pairs whose orders the exchange refused in the latest submit_orders call
     def __init__(self, broker, metadata, models=None, strategy="model", state=None, state_path=None, event_path=None,
                  equity_path=None):
         if isinstance(broker, LiveBroker) and (DRY_RUN or not config.LIVE_TRADING_ENABLED):
@@ -126,6 +127,7 @@ class TradingEngine:
     def submit_orders(self, orders, targets, quotes, now_ms):
         """Submit planned orders one at a time within quota, cash and exposure limits."""
         events = []
+        self.rejected = []
         for order in orders:
             if not self.state.slots(now_ms):
                 break
@@ -161,6 +163,13 @@ class TradingEngine:
                     raise UnknownOrderState("broker returned no confirmed fill")
                 after = self.broker.snapshot(quotes)
                 self.state.mark(after.equity(quotes), self.kill_switch)
+            except OrderRejected as exc:
+                # Nothing filled, so state is certain; skip this order and carry on with the rest.
+                log.warning("%s %s rejected: %s", order.action, order.pair, exc)
+                self.state.uncertain = False
+                self.rejected.append(order.pair)
+                self.persist()
+                continue
             except Exception:
                 self.persist()
                 raise
