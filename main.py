@@ -68,19 +68,28 @@ def run_once():
         if signals is None or signals.empty:
             continue
 
-        latest_signal = signals.iloc[-1]
-        if latest_signal <= 0:
-            log.info("%s: strategy %s signal=%.4f (no action)", pair, SELECTED_STRATEGY, latest_signal)
+        raw_signal = signals.iloc[-1]
+        if raw_signal <= 0:
+            log.info("%s: strategy %s signal=%.4f (no action)", pair, SELECTED_STRATEGY, raw_signal)
             continue
 
-        log.info("%s: STRATEGY SIGNAL TRIGGERED (%s) target_weight=%.4f", pair, SELECTED_STRATEGY, latest_signal)
+        # Calculate realized volatility for multi-factor sizing
+        price_col = "close" if "close" in df.columns else "last_price"
+        realized_vol = df[price_col].pct_change().rolling(30, min_periods=5).std().iloc[-1]
+
+        # Apply Multi-Factor Position Sizing Formula
+        final_size = sizing.calculate_position_size(raw_signal, realized_vol)
+        if final_size <= 0:
+            continue
+
+        log.info("%s: STRATEGY SIGNAL TRIGGERED (%s) size=%.4f (raw=%.4f, vol=%.6f)", pair, SELECTED_STRATEGY, final_size, raw_signal, realized_vol if not np.isnan(realized_vol) else 0.0)
 
         # Per-coin Live vs Paper-trade logic:
         if not DRY_RUN and (pair in LIVE_PAIRS or "ALL" in LIVE_PAIRS):
-            log.info("🚀 [LIVE ORDER] Executing REAL order on Roostoo for %s with size=%.4f", pair, latest_signal)
-            place_order(pair, "BUY", quantity=latest_signal)
+            log.info("🚀 [LIVE ORDER] Executing REAL order on Roostoo for %s with size=%.4f", pair, final_size)
+            place_order(pair, "BUY", quantity=final_size)
         else:
-            log.info("📝 [PAPER TRADE / DRY RUN] Simulated BUY order for %s with size=%.4f", pair, latest_signal)
+            log.info("📝 [PAPER TRADE / DRY RUN] Simulated BUY order for %s with size=%.4f", pair, final_size)
 
 
 def run_forever(interval: int = config.POLL_INTERVAL_SECONDS):
