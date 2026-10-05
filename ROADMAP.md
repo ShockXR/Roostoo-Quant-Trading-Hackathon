@@ -87,7 +87,19 @@ Defaults are placeholders. If the organizers' answers differ, change the setting
 
 ## Risk limits (team decision, 2026-10-05)
 
-The current 12% drawdown halt (`MAX_DRAWDOWN_KILL_SWITCH`) is too loose for a score built on small, stable, appropriately sized bets. Phase 4 replaces it with a tighter, staged de-risk that reduces size as drawdown grows and restores it on recovery, instead of a permanent halt. The thresholds are to be set from the phase 3 backtests. The current halt is left unchanged until then, because lowering a permanent halt now would only make it more likely to stop trading for the rest of the competition.
+The 12% latched halt (`MAX_DRAWDOWN_KILL_SWITCH`) was too loose for a score built on small, stable, appropriately sized bets. For the mid-cap sleeve, phase 4 replaced it with a staged de-risk (`MIDCAP_DRAWDOWN_SCHEDULE`): half size beyond a 3% drawdown from the equity high, 30% beyond 6%, never zero, restored at the next daily rebalance once drawdown recovers.
+
+Chosen from research and validation backtests of the live configuration (blend, 1.5% volatility target, 70% gross), against no schedule and tighter or looser ones:
+
+| Schedule | Research median 14-day composite | Research worst 14-day drawdown | Research return | Validation return | Validation max drawdown |
+|---|---|---|---|---|---|
+| None | 10.4 | -6.9% | +19.6% | +11.2% | -4.6% |
+| 2%/4% (0.5, 0.25) | 6.3 | -3.5% | +5.7% | +4.8% | -3.4% |
+| 3%/5% (0.5, 0.25) | 4.8 | -4.3% | +13.1% | +6.9% | -4.0% |
+| **3%/6% (0.5, 0.3), chosen** | **11.0** | **-5.1%** | **+13.2%** | **+7.8%** | **-4.1%** |
+| 4%/6% (0.5, 0.25) | 6.2 | -4.8% | +9.3% | +7.0% | -4.6% |
+
+Every schedule gives up some return in exchange for a smaller worst case; with 8 research blocks the composite differences are within noise. The holdout was not used for this choice. The majors runner keeps the old 12% halt.
 
 ## Phase 1 status (as of 2026-10-05)
 
@@ -120,6 +132,10 @@ Downloaded Binance spot 1m klines for the 17 core mid-caps (USDT pairs), 2026-04
 Daily volatility is the standard deviation of hourly returns scaled to a day. Many minutes with no trades (ASTER, APT) mean 1m bars are noisy for these coins; research should use 15m or 1h bars.
 
 Still to do: the live spread and volume check over several days needs a long-running ticker logger, best run on the EC2 instance; it cannot run from a laptop session.
+
+## Phase 3 and 4 status (as of 2026-10-05)
+
+Phase 3 chose a two-lookback momentum blend ([docs/MIDCAP_RESEARCH.md](docs/MIDCAP_RESEARCH.md)); the team set a 1.5% daily volatility target. Phase 4 wired it into the bot as `--strategy midcap` with the staged de-risk above. What remains before live trading is in [docs/LIVE_READINESS.md](docs/LIVE_READINESS.md).
 
 ## Gates
 

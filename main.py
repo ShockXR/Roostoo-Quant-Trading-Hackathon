@@ -30,6 +30,7 @@ def atomic_json(path, payload):
 
 
 class TradingEngine:
+    kill_switch = None  # drawdown fraction that latches a halt; None uses config.MAX_DRAWDOWN_KILL_SWITCH
     def __init__(self, broker, metadata, models=None, strategy="model", state=None, state_path=None, event_path=None,
                  equity_path=None):
         if isinstance(broker, LiveBroker) and (DRY_RUN or not config.LIVE_TRADING_ENABLED):
@@ -69,18 +70,7 @@ class TradingEngine:
             quotes[pair] = Quote(float(row.last_price), float(row.max_bid), float(row.min_ask), int(row.timestamp))
         if not quotes:
             return []
-        snapshot = self.broker.snapshot(quotes)  # live: raises while orders are pending or balances locked
-        if self.state.uncertain:
-            # Live holdings are re-read from the exchange every cycle. With no
-            # pending orders or locked balances the wallet already reflects the
-            # ambiguous order, so planning from it cannot double-count. Clearing
-            # here keeps the bot autonomous; manual intervention is prohibited.
-            self.state.uncertain = False
-            log.warning("uncertain order reconciled against exchange balances")
-            self.persist()
-        equity = snapshot.equity(quotes)
-        self.state.mark(equity)
-        self.log_equity(now_ms, equity)
+        snapshot, equity = self.reconcile(quotes, now_ms)
         panel = build_price_panel(raw)
         lookback = max(max(config.MOMENTUM_HORIZONS) + 1, 2 * config.MA_WINDOWS["slow"],
                        config.MEAN_REV_WINDOW + 1, 2 * config.REGIME_VOL_WINDOW + 1, config.REGIME_TREND_WINDOW + 1)
@@ -115,6 +105,26 @@ class TradingEngine:
                     return []
                 targets[pair] = 0.
         orders = plan_orders(targets, snapshot, quotes, self.metadata)
+        return self.submit_orders(orders, targets, quotes, now_ms)
+
+    def reconcile(self, quotes, now_ms):
+        """Read holdings, clear a resolved uncertain order, mark and log equity."""
+        snapshot = self.broker.snapshot(quotes)  # live: raises while orders are pending or balances locked
+        if self.state.uncertain:
+            # Live holdings are re-read from the exchange every cycle. With no
+            # pending orders or locked balances the wallet already reflects the
+            # ambiguous order, so planning from it cannot double-count. Clearing
+            # here keeps the bot autonomous; manual intervention is prohibited.
+            self.state.uncertain = False
+            log.warning("uncertain order reconciled against exchange balances")
+            self.persist()
+        equity = snapshot.equity(quotes)
+        self.state.mark(equity, self.kill_switch)
+        self.log_equity(now_ms, equity)
+        return snapshot, equity
+
+    def submit_orders(self, orders, targets, quotes, now_ms):
+        """Submit planned orders one at a time within quota, cash and exposure limits."""
         events = []
         for order in orders:
             if not self.state.slots(now_ms):
@@ -126,7 +136,7 @@ class TradingEngine:
                 continue
             current = self.broker.snapshot(quotes)
             equity = current.equity(quotes)
-            self.state.mark(equity)
+            self.state.mark(equity, self.kill_switch)
             if self.state.halted and order.action in {"BUY", "SHORT_OPEN"}:
                 continue
             if order.action in {"BUY", "SHORT_OPEN"}:
@@ -150,7 +160,7 @@ class TradingEngine:
                 if not isinstance(event, dict) or event.get("status") != "FILLED":
                     raise UnknownOrderState("broker returned no confirmed fill")
                 after = self.broker.snapshot(quotes)
-                self.state.mark(after.equity(quotes))
+                self.state.mark(after.equity(quotes), self.kill_switch)
             except Exception:
                 self.persist()
                 raise
@@ -203,12 +213,24 @@ def run_forever(engine, interval=None):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model-dir", default=config.MODEL_DIR)
-    parser.add_argument("--state", default=config.PAPER_STATE_PATH)
+    parser.add_argument("--state", default=None, help="state file (default depends on --strategy)")
     parser.add_argument("--events", default=config.EVENT_LOG_PATH)
     parser.add_argument("--equity", default=config.EQUITY_LOG_PATH)
-    parser.add_argument("--strategy", choices=["model", "momentum", "mean_reversion", "cross_sectional"], default="model")
+    parser.add_argument("--strategy", choices=["midcap", "model", "momentum", "mean_reversion", "cross_sectional"],
+                        default="model")
     args = parser.parse_args()
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s", force=True)
+    if args.strategy == "midcap":
+        from . import midcap_live
+        info = get_exchange_info()
+        if not info or not info.get("IsRunning"):
+            parser.error("exchange metadata unavailable/not running")
+        engine = midcap_live.build(info["TradePairs"], live=not DRY_RUN, state_path=args.state or config.MIDCAP_STATE_PATH,
+                                   event_path=args.events, equity_path=args.equity)
+        log.info("Starting mid-cap sleeve in %s mode", "paper" if DRY_RUN else "live")
+        midcap_live.run_forever(engine)
+        return
+    args.state = args.state or config.PAPER_STATE_PATH
     models = {}
     if args.strategy == "model":
         for pair in config.UNIVERSE:

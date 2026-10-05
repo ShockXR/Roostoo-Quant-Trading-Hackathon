@@ -160,3 +160,20 @@ PAPER_STATE_PATH = "data_store/paper_state.json"
 EVENT_LOG_PATH = "logs/events.jsonl"
 EQUITY_LOG_PATH = "logs/equity.jsonl"
 COMPETITION_START_MS = 1_791_072_000_000  # 2026-10-04 00:00 UTC; live trading Oct 4-17
+
+# --- Mid-cap sleeve (docs/MIDCAP_RESEARCH.md; BTC and ETH excluded) ---
+MIDCAP_PAIRS = [
+    "ENA/USD", "FET/USD", "WLD/USD", "UNI/USD", "TAO/USD", "ONDO/USD", "AAVE/USD", "VIRTUAL/USD", "HBAR/USD",
+    "ARB/USD", "ICP/USD", "FIL/USD", "SEI/USD", "APT/USD", "ASTER/USD", "XLM/USD", "PUMP/USD",
+]
+MIDCAP_TARGET_DAILY_VOL = 0.015   # team decision 2026-10-05
+MIDCAP_REBALANCE_EVERY_HOURS = 24  # rebalance at 00:00 UTC
+MIDCAP_REBALANCE_DELAY_MS = 120_000  # wait for the hourly kline to close on Binance
+MIDCAP_REBALANCE_BAND = 0.01       # skip per-coin trades under 1% of equity (as in the backtest)
+MIDCAP_MAX_REBALANCE_CYCLES = 15   # give up on a rebalance that cannot finish (e.g. repeated rejections)
+# Staged drawdown de-risk from the equity high-water mark: half size beyond 3%, 30% beyond 6%.
+# Never zero, so the bot keeps trading; size returns at the next daily rebalance once drawdown recovers.
+MIDCAP_DRAWDOWN_SCHEDULE = ((0.03, 0.5), (0.06, 0.3))
+MIDCAP_HISTORY_HOURS = 400         # hourly closes fetched for signals (needs at least 169)
+MIDCAP_STATE_PATH = "data_store/midcap_state.json"
+BINANCE_KLINE_URLS = ("https://api.binance.com/api/v3/klines", "https://data-api.binance.vision/api/v3/klines")

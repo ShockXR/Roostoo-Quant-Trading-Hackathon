@@ -16,21 +16,28 @@ What stands between `main` and a bot that trades autonomously on the competition
 - Live broker: an uncertain order (ambiguous response) no longer blocks the bot forever. The flag clears on the next cycle once the exchange reports no pending orders and no locked balances, because live holdings are re-read from the exchange every cycle. Before, clearing it needed a person, which the rules prohibit. Paper mode keeps the old blocking behavior.
 - Live broker: tiny negative balances from sell rounding (FAQ Q24) worth under $1 are ignored instead of failing every cycle. Larger negative balances still stop the cycle.
 
+## Done in phase 4 (branch `phase1-scoring`)
+
+- `--strategy midcap` runs the mid-cap sleeve (`midcap_live.py`): the two-lookback momentum blend at a 1.5% daily volatility target, 20% per coin, 70% gross, rebalanced once a day after 00:00 UTC.
+- Signals come from Binance's public hourly klines (`data/binance_live.py`, with `data-api.binance.vision` as a fallback host), so there is no warm-up after a restart. A test checks that live weights equal the backtest's weights for the same hour.
+- The latched 12% halt is replaced for this sleeve by a staged de-risk from the equity high-water mark: half size beyond a 3% drawdown, 30% beyond 6%. Size is never cut to zero, so the bot keeps trading every day. Cuts trade at once; size comes back only at the next daily rebalance and only if drawdown has recovered.
+- A restart restores holdings and rebalance state from `data_store/midcap_state.json` and catches up on a missed rebalance. A rebalance that cannot finish (for example repeated rejections) is abandoned after 15 cycles until the next day.
+
 ## Blockers before going live
 
-1. **No strategy that can start.** `--strategy model` needs trained artifacts in `models/` and there are none. The rule strategies (`momentum`, `mean_reversion`, `cross_sectional`) refuse to start unless `COMPONENTS["cost_filter"]` is `False`. A fast-lane strategy has to be chosen and backtested (phase 3).
-2. **The drawdown halt is permanent and too loose.** The team wants a tighter limit than 12% (see ROADMAP.md, Risk limits). `ExecutionState.mark` latches `halted` at a 12% drawdown and never resumes, even across restarts. A halted bot sells everything and stops trading, which loses the remaining active days needed for the 8-day rule and freezes the score. Phase 4 should replace it with an automatic de-risk that scales back up.
-3. **Two live switches.** `DRY_RUN` in `main.py` and `LIVE_TRADING_ENABLED` in `config.py` must both change. Do it in its own commit, after the strategy and halt changes.
-4. **Universe is majors only.** `config.UNIVERSE` is `UNIVERSE_GROUPS["majors"]`; the mid-cap list in `ROADMAP.md` is not wired in.
+1. **Two live switches.** `DRY_RUN` in `main.py` and `LIVE_TRADING_ENABLED` in `config.py` must both change. Do it in its own commit after a paper run.
+2. **Paper run (phase 5).** Run `--strategy midcap` in paper mode on the EC2 instance through at least one 00:00 UTC rebalance and check orders, quantities and the equity log.
+3. **Deployment.** The instance still runs the `Samyak` branch. `phase1-scoring` must be merged into `main` and pushed first.
 
 ## Known limits to keep in mind
 
-- **Warm-up after every restart.** Features need 61 contiguous one-minute ticks per pair from the bot's own collection, and any gap over 2 minutes resets that. Each restart costs about an hour without new trades.
-- **Pending orders stop the bot.** Any pending order or locked balance makes every cycle stop until it clears. The bot only sends MARKET orders, which the API documentation shows as filled immediately, so this should not happen, but nothing cancels a stuck order automatically.
-- **Assets outside the universe stop the bot.** A held coin that is not in `config.UNIVERSE` makes the live snapshot fail. Sell a coin before removing it from the universe.
-- **Ticker gaps.** On 2026-10-05, `TON/USD` and `OMNI/USD` were listed as tradable in `/v3/exchangeInfo` but absent from `/v3/ticker`. The bot skips pairs without quotes, so TON (in the majors list) is silently never traded.
+- **Pending orders stop the bot.** Any pending order or locked balance makes every cycle stop until it clears. The bot only sends MARKET orders, which the API documentation shows as filled immediately, but nothing cancels a stuck order automatically.
+- **Assets outside the sleeve stop the bot.** A held coin that is not in `config.MIDCAP_PAIRS` makes the live snapshot fail. The competition account should hold only USD and mid-cap coins.
+- **Binance access.** The signal needs Binance's public API (FAQ Q16 allows other data APIs). If both hosts fail, the bot holds its positions and retries every minute; it does not trade on stale data.
+- **Ticker gaps.** On 2026-10-05, `TON/USD` and `OMNI/USD` were listed as tradable in `/v3/exchangeInfo` but absent from `/v3/ticker`. Neither is in the mid-cap list. A mid-cap pair missing from the ticker stops the cycle.
 - **Fees are unconfirmed.** `config.py` assumes 0.1% taker; the API documentation example shows 0.012%. Check the `fee` on the first live fills in `logs/events.jsonl`.
-- **Order throughput.** One ticker call per minute plus about 7 calls per order (balance, pending, shorts before and after, plus the order) under the 30 per minute limit allows about 3 orders per minute.
+- **Order throughput.** One ticker call per minute plus about 7 calls per order under the 30 per minute limit allows about 3 orders per minute, so a full rebalance takes a few minutes.
+- **The majors runner (`--strategy model` and the rule strategies) is unchanged** and still uses the latched 12% halt and one-minute feature warm-up.
 
 ## Deploying
 
@@ -39,7 +46,7 @@ On the EC2 instance (Sydney, Session Manager), inside tmux, with the competition
 ```sh
 git fetch origin && git checkout main && git pull
 pip install -r requirements.txt
-python -m roostoo_bot.main --strategy <chosen> --state data_store/live_state.json
+python -m roostoo_bot.main --strategy midcap --state data_store/midcap_live_state.json
 ```
 
-Use a separate state file for live; the engine refuses to load a paper state file in live mode.
+Use a separate state file for live; the engine refuses to load a paper state file in live mode. Check progress with `python -m roostoo_bot.scripts.live_score --mode live`.
