@@ -142,3 +142,16 @@ WALKFORWARD_VAL_BARS = 500
 WALKFORWARD_STEP_BARS = 500
 
 RANDOM_SEED = 42
+
+# --- Daily dip-reversal strategy (strategy.py "reversal") ---
+# Buy MAX_POSITION_PER_ASSET when the last REVERSAL_LOOKBACK_BARS return is
+# below -REVERSAL_K x its expected size (1-day std of 1m returns scaled by
+# sqrt(lookback)), checked at the close of each REVERSAL_CHECK_EVERY-minute
+# block; hold REVERSAL_HOLD_BARS after the last qualifying signal.
+# Chosen as the centre of the plateau that was positive on Jul (train) and
+# Aug (validation) 2026; see TRADING_BOT_OPTIMIZATION_REPORT.md. Lookbacks
+# under ~1 day were NOT robust (negative on the Sep test period).
+REVERSAL_LOOKBACK_BARS = 1440   # 1 day of 1m bars
+REVERSAL_K = 1.5
+REVERSAL_HOLD_BARS = 1440
+REVERSAL_CHECK_EVERY = 60       # minutes

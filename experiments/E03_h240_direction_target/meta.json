@@ -1,0 +1,24 @@
+{
+  "id": "E03_h240_direction_target",
+  "strategy": "baseline",
+  "params": {
+    "horizon": 240,
+    "config": {
+      "TARGET_MODE": "direction"
+    }
+  },
+  "periods": [
+    "train",
+    "validation"
+  ],
+  "fee_per_side": 0.001,
+  "slippage_per_side": 0.00015,
+  "max_position_per_asset": 0.2,
+  "max_portfolio_exposure": 0.7,
+  "target_horizon": 240,
+  "targets_from": null,
+  "run_at": "2026-10-06T00:28:19",
+  "runtime_s": 1256.4,
+  "git_commit": "87ad83f",
+  "note": "H: the threshold target P(r>0.29%) rises with volatility regardless of direction, so the model learned 'vol spiked' (event study: entries after +46-64bp pumps, flat afterwards). A direction target (r>0) isolates direction. Change vs E02: TARGET_MODE threshold->direction."
+}

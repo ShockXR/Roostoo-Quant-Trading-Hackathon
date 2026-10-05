@@ -1,0 +1,21 @@
+{
+  "id": "E06_reversal_l240_k1.0",
+  "strategy": "reversal",
+  "params": {
+    "lookback": 240,
+    "k": 1.0
+  },
+  "periods": [
+    "train"
+  ],
+  "fee_per_side": 0.001,
+  "slippage_per_side": 0.00015,
+  "max_position_per_asset": 0.2,
+  "max_portfolio_exposure": 0.7,
+  "target_horizon": 10,
+  "targets_from": null,
+  "run_at": "2026-10-06T00:30:40",
+  "runtime_s": 14.7,
+  "git_commit": "87ad83f",
+  "note": "E06 grid (train only): buy 20% when lookback return < -k * expected vol, hold lookback bars, hourly checks. H: 4h returns mean-revert in July (autocorr -0.07..-0.15 on 4/5 assets) and the baseline lost most on entries after a rise."
+}

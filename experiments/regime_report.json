@@ -1,0 +1,194 @@
+{
+  "F01_final": {
+    "stats": {
+      "total_return": 0.08388811492812254,
+      "max_drawdown": -0.023591075976396203,
+      "drawdown_episodes": 121,
+      "longest_underwater_hours": 684.5166666666667,
+      "losing_days": 20,
+      "longest_losing_day_streak": 2,
+      "worst_day": -0.009751214864144875,
+      "worst_7d_window": -0.012520808544924322,
+      "losing_weeks": 2,
+      "monthly_returns": {
+        "2026-07": 0.02269609054497934,
+        "2026-08": 0.020319067365641263,
+        "2026-09": 0.03872804087619941
+      }
+    },
+    "direction": [
+      {
+        "direction": "down >1%",
+        "days": 22,
+        "pnl": -3061.0,
+        "mean_daily_ret_bp": -13.2,
+        "positive_days": 0.23
+      },
+      {
+        "direction": "flat \u00b11%",
+        "days": 41,
+        "pnl": 2459.0,
+        "mean_daily_ret_bp": 5.8,
+        "positive_days": 0.29
+      },
+      {
+        "direction": "up >1%",
+        "days": 29,
+        "pnl": 8990.0,
+        "mean_daily_ret_bp": 29.9,
+        "positive_days": 0.38
+      }
+    ],
+    "vol": [
+      {
+        "vol": "low vol",
+        "days": 31,
+        "pnl": -183.0,
+        "mean_daily_ret_bp": -0.5,
+        "positive_days": 0.19
+      },
+      {
+        "vol": "mid vol",
+        "days": 30,
+        "pnl": 2358.0,
+        "mean_daily_ret_bp": 7.8,
+        "positive_days": 0.37
+      },
+      {
+        "vol": "high vol",
+        "days": 31,
+        "pnl": 6214.0,
+        "mean_daily_ret_bp": 19.3,
+        "positive_days": 0.35
+      }
+    ]
+  },
+  "E01_baseline": {
+    "stats": {
+      "total_return": -0.014989124592520331,
+      "max_drawdown": -0.014989124592520331,
+      "drawdown_episodes": 1,
+      "longest_underwater_hours": 2140.266666666667,
+      "losing_days": 41,
+      "longest_losing_day_streak": 6,
+      "worst_day": -0.003556610879228317,
+      "worst_7d_window": -0.005959933689487662,
+      "losing_weeks": 11,
+      "monthly_returns": {
+        "2026-07": -0.0025391096005219493,
+        "2026-08": -0.00799109114993557,
+        "2026-09": -0.004526790258766011
+      }
+    },
+    "direction": [
+      {
+        "direction": "down >1%",
+        "days": 22,
+        "pnl": -653.0,
+        "mean_daily_ret_bp": -3.0,
+        "positive_days": 0.14
+      },
+      {
+        "direction": "flat \u00b11%",
+        "days": 41,
+        "pnl": -505.0,
+        "mean_daily_ret_bp": -1.2,
+        "positive_days": 0.05
+      },
+      {
+        "direction": "up >1%",
+        "days": 29,
+        "pnl": -341.0,
+        "mean_daily_ret_bp": -1.2,
+        "positive_days": 0.21
+      }
+    ],
+    "vol": [
+      {
+        "vol": "low vol",
+        "days": 31,
+        "pnl": -97.0,
+        "mean_daily_ret_bp": -0.3,
+        "positive_days": 0.1
+      },
+      {
+        "vol": "mid vol",
+        "days": 30,
+        "pnl": -772.0,
+        "mean_daily_ret_bp": -2.6,
+        "positive_days": 0.03
+      },
+      {
+        "vol": "high vol",
+        "days": 31,
+        "pnl": -630.0,
+        "mean_daily_ret_bp": -2.0,
+        "positive_days": 0.23
+      }
+    ]
+  },
+  "B00_buy_hold_20pct": {
+    "stats": {
+      "total_return": 0.3594647033325058,
+      "max_drawdown": -0.06954660804852475,
+      "drawdown_episodes": 276,
+      "longest_underwater_hours": 670.4166666666666,
+      "losing_days": 37,
+      "longest_losing_day_streak": 3,
+      "worst_day": -0.03765651272295023,
+      "worst_7d_window": -0.04272824518811347,
+      "losing_weeks": 6,
+      "monthly_returns": {
+        "2026-07": 0.04650995646778844,
+        "2026-08": 0.20843918949794804,
+        "2026-09": 0.07497848126406281
+      }
+    },
+    "direction": [
+      {
+        "direction": "down >1%",
+        "days": 22,
+        "pnl": -42377.0,
+        "mean_daily_ret_bp": -159.3,
+        "positive_days": 0.0
+      },
+      {
+        "direction": "flat \u00b11%",
+        "days": 41,
+        "pnl": 3011.0,
+        "mean_daily_ret_bp": 6.4,
+        "positive_days": 0.63
+      },
+      {
+        "direction": "up >1%",
+        "days": 29,
+        "pnl": 75312.0,
+        "mean_daily_ret_bp": 222.7,
+        "positive_days": 1.0
+      }
+    ],
+    "vol": [
+      {
+        "vol": "low vol",
+        "days": 31,
+        "pnl": 3022.0,
+        "mean_daily_ret_bp": 9.5,
+        "positive_days": 0.61
+      },
+      {
+        "vol": "mid vol",
+        "days": 30,
+        "pnl": -4264.0,
+        "mean_daily_ret_bp": -10.2,
+        "positive_days": 0.53
+      },
+      {
+        "vol": "high vol",
+        "days": 31,
+        "pnl": 37189.0,
+        "mean_daily_ret_bp": 104.2,
+        "positive_days": 0.65
+      }
+    ]
+  }
+}

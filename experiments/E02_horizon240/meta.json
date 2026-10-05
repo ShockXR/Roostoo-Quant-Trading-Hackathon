@@ -1,0 +1,21 @@
+{
+  "id": "E02_horizon240",
+  "strategy": "baseline",
+  "params": {
+    "horizon": 240
+  },
+  "periods": [
+    "train",
+    "validation"
+  ],
+  "fee_per_side": 0.001,
+  "slippage_per_side": 0.00015,
+  "max_position_per_asset": 0.2,
+  "max_portfolio_exposure": 0.7,
+  "target_horizon": 240,
+  "targets_from": null,
+  "run_at": "2026-10-06T00:27:47",
+  "runtime_s": 12.3,
+  "git_commit": "87ad83f",
+  "note": "H: 10-bar moves (7-10bp median) cannot cover ~23bp round-trip cost; a 240-bar horizon (33-47bp median move) gives the same model room to clear costs. Only change: TARGET_HORIZON 10->240 (purge and hold follow it)."
+}

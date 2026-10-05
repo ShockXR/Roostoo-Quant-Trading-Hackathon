@@ -1,0 +1,24 @@
+{
+  "id": "E10_takeprofit/tp0.75",
+  "strategy": "reversal",
+  "params": {
+    "lookback": 1440,
+    "k": 1.5,
+    "hold": 1440,
+    "take_profit": 0.75
+  },
+  "periods": [
+    "train",
+    "validation"
+  ],
+  "fee_per_side": 0.001,
+  "slippage_per_side": 0.00015,
+  "max_position_per_asset": 0.2,
+  "max_portfolio_exposure": 0.7,
+  "target_horizon": 10,
+  "targets_from": null,
+  "run_at": "2026-10-06T00:38:33",
+  "runtime_s": 33.0,
+  "git_commit": "87ad83f",
+  "note": "on C1; single change: take_profit=0.75. H: winners peak at median +2.3% but close near +0.8%"
+}

@@ -1,5 +1,9 @@
 # Backtest results — Binance 1m history, Jul–Sep 2026
 
+> Superseded: see `TRADING_BOT_OPTIMIZATION_REPORT.md` (Oct 2026) for the
+> corrected backtester, the five-asset baseline and the strategy that replaced
+> the ML timing layer in the backtest.
+
 Data: Binance spot 1m klines (`binance_downloader.py`), SOL/ETH/BTC plus
 BNB/XRP as cross-sectional context. Research window Jul 1 – Aug 31;
 September held out and evaluated once. Fees: 0.10% taker + 0.03% slippage

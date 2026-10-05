@@ -1,0 +1,277 @@
+{
+  "asset": [
+    {
+      "symbol": "BNBUSDT",
+      "trades": 3,
+      "pnl": 912.94,
+      "win_rate": 1.0,
+      "avg_pnl": 304.31
+    },
+    {
+      "symbol": "BTCUSDT",
+      "trades": 6,
+      "pnl": 1661.59,
+      "win_rate": 0.833,
+      "avg_pnl": 276.93
+    },
+    {
+      "symbol": "ETHUSDT",
+      "trades": 4,
+      "pnl": -372.77,
+      "win_rate": 0.25,
+      "avg_pnl": -93.19
+    },
+    {
+      "symbol": "SOLUSDT",
+      "trades": 4,
+      "pnl": -21.04,
+      "win_rate": 0.75,
+      "avg_pnl": -5.26
+    },
+    {
+      "symbol": "XRPUSDT",
+      "trades": 6,
+      "pnl": 88.89,
+      "win_rate": 0.833,
+      "avg_pnl": 14.82
+    }
+  ],
+  "month": [
+    {
+      "month": "2026-07",
+      "trades": 23,
+      "pnl": 2269.61,
+      "win_rate": 0.739,
+      "avg_pnl": 98.68
+    }
+  ],
+  "trend_regime": [
+    {
+      "trend_regime": "down (close < 1d mean)",
+      "trades": 23,
+      "pnl": 2269.61,
+      "win_rate": 0.739,
+      "avg_pnl": 98.68
+    }
+  ],
+  "vol_regime": [
+    {
+      "vol_regime": "low",
+      "trades": 9,
+      "pnl": -460.03,
+      "win_rate": 0.556,
+      "avg_pnl": -51.11
+    },
+    {
+      "vol_regime": "mid",
+      "trades": 7,
+      "pnl": 1197.83,
+      "win_rate": 0.714,
+      "avg_pnl": 171.12
+    },
+    {
+      "vol_regime": "high",
+      "trades": 7,
+      "pnl": 1531.8,
+      "win_rate": 1.0,
+      "avg_pnl": 218.83
+    }
+  ],
+  "prior_4h_move": [
+    {
+      "prior_4h_regime": "fell",
+      "trades": 8,
+      "pnl": 484.49,
+      "win_rate": 0.625,
+      "avg_pnl": 60.56
+    },
+    {
+      "prior_4h_regime": "flat",
+      "trades": 7,
+      "pnl": 1302.66,
+      "win_rate": 0.857,
+      "avg_pnl": 186.09
+    },
+    {
+      "prior_4h_regime": "rose",
+      "trades": 8,
+      "pnl": 482.47,
+      "win_rate": 0.75,
+      "avg_pnl": 60.31
+    }
+  ],
+  "hold_time": [
+    {
+      "hold_bucket": "4-8h",
+      "trades": 1,
+      "pnl": 1.54,
+      "win_rate": 1.0,
+      "avg_pnl": 1.54
+    },
+    {
+      "hold_bucket": "8-24h",
+      "trades": 5,
+      "pnl": 762.86,
+      "win_rate": 0.6,
+      "avg_pnl": 152.57
+    },
+    {
+      "hold_bucket": ">24h",
+      "trades": 17,
+      "pnl": 1505.21,
+      "win_rate": 0.765,
+      "avg_pnl": 88.54
+    }
+  ],
+  "weekday": [
+    {
+      "weekday": "Fri",
+      "trades": 7,
+      "pnl": 52.25,
+      "win_rate": 0.571,
+      "avg_pnl": 7.46
+    },
+    {
+      "weekday": "Mon",
+      "trades": 3,
+      "pnl": 1393.32,
+      "win_rate": 1.0,
+      "avg_pnl": 464.44
+    },
+    {
+      "weekday": "Sat",
+      "trades": 2,
+      "pnl": 272.91,
+      "win_rate": 1.0,
+      "avg_pnl": 136.46
+    },
+    {
+      "weekday": "Sun",
+      "trades": 1,
+      "pnl": 191.7,
+      "win_rate": 1.0,
+      "avg_pnl": 191.7
+    },
+    {
+      "weekday": "Thu",
+      "trades": 3,
+      "pnl": -1064.92,
+      "win_rate": 0.0,
+      "avg_pnl": -354.97
+    },
+    {
+      "weekday": "Tue",
+      "trades": 3,
+      "pnl": 653.37,
+      "win_rate": 1.0,
+      "avg_pnl": 217.79
+    },
+    {
+      "weekday": "Wed",
+      "trades": 4,
+      "pnl": 770.98,
+      "win_rate": 1.0,
+      "avg_pnl": 192.75
+    }
+  ],
+  "hour_utc": [
+    {
+      "hour": "2",
+      "trades": 3,
+      "pnl": 290.04,
+      "win_rate": 0.667,
+      "avg_pnl": 96.68
+    },
+    {
+      "hour": "6",
+      "trades": 4,
+      "pnl": 634.95,
+      "win_rate": 1.0,
+      "avg_pnl": 158.74
+    },
+    {
+      "hour": "7",
+      "trades": 1,
+      "pnl": 102.01,
+      "win_rate": 1.0,
+      "avg_pnl": 102.01
+    },
+    {
+      "hour": "8",
+      "trades": 1,
+      "pnl": 170.9,
+      "win_rate": 1.0,
+      "avg_pnl": 170.9
+    },
+    {
+      "hour": "9",
+      "trades": 1,
+      "pnl": 125.64,
+      "win_rate": 1.0,
+      "avg_pnl": 125.64
+    },
+    {
+      "hour": "10",
+      "trades": 1,
+      "pnl": 113.2,
+      "win_rate": 1.0,
+      "avg_pnl": 113.2
+    },
+    {
+      "hour": "14",
+      "trades": 3,
+      "pnl": 555.65,
+      "win_rate": 0.333,
+      "avg_pnl": 185.22
+    },
+    {
+      "hour": "16",
+      "trades": 4,
+      "pnl": 134.63,
+      "win_rate": 0.75,
+      "avg_pnl": 33.66
+    },
+    {
+      "hour": "17",
+      "trades": 2,
+      "pnl": -665.86,
+      "win_rate": 0.0,
+      "avg_pnl": -332.93
+    },
+    {
+      "hour": "18",
+      "trades": 2,
+      "pnl": 797.83,
+      "win_rate": 1.0,
+      "avg_pnl": 398.92
+    },
+    {
+      "hour": "23",
+      "trades": 1,
+      "pnl": 10.62,
+      "win_rate": 1.0,
+      "avg_pnl": 10.62
+    }
+  ],
+  "excursions": {
+    "median_mfe_winners": 0.02341916210256767,
+    "median_mae_winners": -0.007315221926249227,
+    "median_mfe_losers": 0.005142779198226477,
+    "median_mae_losers": -0.022729904291603598,
+    "losers_that_were_up_0.5pct": 0.5,
+    "winners_that_were_down_0.5pct": 0.5882352941176471,
+    "mean_gross_move": 0.007921471430938156,
+    "median_gross_move": 0.007785821609069821
+  },
+  "event_study": {
+    "-240": 0.01113402282992137,
+    "-60": 0.005359835777172685,
+    "-10": 0.0010935571281317405,
+    "0": 0.0,
+    "10": -0.0007249381445125914,
+    "60": 0.0006366584165014542,
+    "120": 0.00032665145974708487,
+    "240": 1.2035087374983672e-05,
+    "480": 0.0007518318692232006
+  }
+}

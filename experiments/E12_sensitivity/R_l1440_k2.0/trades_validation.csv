@@ -1,0 +1,2 @@
+symbol,entry_time,exit_time,bars,pnl,return_on_equity,costs,max_weight,side,open_at_end
+BNBUSDT,2026-08-29 07:00:00+00:00,2026-08-30 07:00:00+00:00,1440,159.72381672993956,0.0015972381672993956,46.236823842562295,0.2,long,False

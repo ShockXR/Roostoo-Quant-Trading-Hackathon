@@ -1,0 +1,26 @@
+{
+  "id": "E04_h240_train7d",
+  "strategy": "baseline",
+  "params": {
+    "horizon": 240,
+    "config": {
+      "WALKFORWARD_TRAIN_BARS": 10080,
+      "WALKFORWARD_VAL_BARS": 1440,
+      "WALKFORWARD_STEP_BARS": 1440
+    }
+  },
+  "periods": [
+    "train",
+    "validation"
+  ],
+  "fee_per_side": 0.001,
+  "slippage_per_side": 0.00015,
+  "max_position_per_asset": 0.2,
+  "max_portfolio_exposure": 0.7,
+  "target_horizon": 240,
+  "targets_from": null,
+  "run_at": "2026-10-06T00:28:19",
+  "runtime_s": 1570.9,
+  "git_commit": "87ad83f",
+  "note": "H: with h=240 a 2000-bar train window holds ~8 independent labels, so each fold's RF fits noise. A 7-day window (~42 independent labels) should give more stable predictions. Change vs E02: walk-forward train 2000->10080 bars, val/step 500->1440."
+}
