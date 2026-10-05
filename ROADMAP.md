@@ -39,7 +39,7 @@ Filter: 24h volume and bid/ask spread, since spread is the main hidden cost.
 - **Exclude:** memes (17-25bp spreads), anything under about $1M volume or over about 8bp spread, PAXG, tokenized stocks.
 - **Overlap to decide:** `config.py` "majors" already contains APT, ICP, HBAR, FIL, XLM, SUI, NEAR, TON. Assign each to one sleeve.
 - **BTC and ETH are out of scope for this sleeve** (team decision, 2026-10-05): not traded and not used as signal inputs. Market context comes from an equal-weighted index of the mid-cap universe instead.
-- **Thin history:** PUMP, ASTER, XPL, WLFI and other recent listings give short, survivor-biased backtests.
+- **History:** PUMP and ASTER turned out to have the full Apr-Oct 2026 history on Binance. XPL and WLFI were not downloaded. The universe was chosen using today's volume, so backtests on it still carry some survivorship bias.
 
 ## Candidate trades (hypotheses to test, in order)
 
@@ -92,6 +92,34 @@ The current 12% drawdown halt (`MAX_DRAWDOWN_KILL_SWITCH`) is too loose for a sc
 ## Phase 1 status (as of 2026-10-05)
 
 Done and committed on branch `phase1-scoring`: scorer, equity logging, live score report and two live-broker fixes. What remains before the bot can trade is in [docs/LIVE_READINESS.md](docs/LIVE_READINESS.md); open questions for the organizers are collected in [docs/ORGANIZER_QUESTIONS.md](docs/ORGANIZER_QUESTIONS.md).
+
+## Phase 2 status (as of 2026-10-05)
+
+Downloaded Binance spot 1m klines for the 17 core mid-caps (USDT pairs), 2026-04-01 to 2026-10-04 UTC, into `binance_data/` (gitignored, about 1.5 GB). Every symbol has 269,280 candles with no gaps; VIRTUAL had 54 exact duplicate candles inside Binance's July archive, which were dropped.
+
+| Symbol | Median daily volume ($M) | Daily volatility (%) | Zero-volume 1m bars (%) |
+|---|---|---|---|
+| TAO | 23.5 | 4.5 | 0.7 |
+| WLD | 19.7 | 6.7 | 0.2 |
+| ENA | 15.3 | 6.1 | 2.6 |
+| AAVE | 14.3 | 4.3 | 0.3 |
+| UNI | 13.4 | 5.0 | 1.1 |
+| XLM | 11.6 | 4.6 | 1.3 |
+| ONDO | 11.0 | 5.2 | 0.8 |
+| FET | 10.6 | 5.1 | 2.2 |
+| PUMP | 9.1 | 6.3 | 2.7 |
+| ASTER | 8.3 | 3.3 | 17.5 |
+| HBAR | 7.0 | 3.5 | 1.3 |
+| FIL | 6.6 | 4.7 | 6.4 |
+| ARB | 5.7 | 5.4 | 5.5 |
+| APT | 5.5 | 4.5 | 11.0 |
+| ICP | 4.9 | 4.7 | 5.5 |
+| VIRTUAL | 4.6 | 4.9 | 3.3 |
+| SEI | 3.4 | 4.1 | 3.2 |
+
+Daily volatility is the standard deviation of hourly returns scaled to a day. Many minutes with no trades (ASTER, APT) mean 1m bars are noisy for these coins; research should use 15m or 1h bars.
+
+Still to do: the live spread and volume check over several days needs a long-running ticker logger, best run on the EC2 instance; it cannot run from a laptop session.
 
 ## Gates
 
