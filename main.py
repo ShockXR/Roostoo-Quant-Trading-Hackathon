@@ -39,9 +39,34 @@ LIVE_PAIRS = getattr(config, "UNIVERSE", config.LARGECAP_UNIVERSE + config.MIDCA
 
 SELECTED_STRATEGY = "reversal"  # Large-cap default strategy
 
-# Track active open positions per pair: 
-# {pair: {"entry_time": float, "entry_price": float, "stop_price": float, "take_profit_price": float, "quantity": float, "sleeve": str}}
-ACTIVE_POSITIONS = {}
+import json
+
+POSITIONS_FILE = os.path.join(getattr(config, "STORE_DIR", "data_store"), "active_positions.json")
+
+
+def load_active_positions() -> dict:
+    if os.path.exists(POSITIONS_FILE):
+        try:
+            with open(POSITIONS_FILE, "r") as f:
+                data = json.load(f)
+                log.info("💾 Loaded %d active positions from %s", len(data), POSITIONS_FILE)
+                return data
+        except Exception as e:
+            log.error("Failed to load active positions file: %s", e)
+    return {}
+
+
+def save_active_positions():
+    try:
+        os.makedirs(os.path.dirname(POSITIONS_FILE), exist_ok=True)
+        with open(POSITIONS_FILE, "w") as f:
+            json.dump(ACTIVE_POSITIONS, f, indent=2)
+    except Exception as e:
+        log.error("Failed to save active positions file: %s", e)
+
+
+# Track active open positions per pair (loaded from disk on startup)
+ACTIVE_POSITIONS = load_active_positions()
 
 
 def process_largecap_sleeve(raw_data: dict[str, pd.DataFrame]):
@@ -161,6 +186,7 @@ def process_largecap_sleeve(raw_data: dict[str, pd.DataFrame]):
             "quantity": coin_quantity,
             "sleeve": "largecap",
         }
+        save_active_positions()
 
         if not DRY_RUN:
             log.info("🚀 [LARGECAP LIVE ORDER] Executing BUY for %s: $%.2f USD (%.4f coins @ $%.2f)", pair, target_usd_cost, coin_quantity, latest_price)
@@ -203,6 +229,7 @@ def process_midcap_sleeve(raw_data: dict[str, pd.DataFrame]):
                     if not DRY_RUN and quantity > 0:
                         place_order(pair, "SELL", quantity=quantity)
                     del ACTIVE_POSITIONS[pair]
+                    save_active_positions()
                     continue
 
                 # Rule 2: Mid-Cap Fee-Protected Take Profit
@@ -213,6 +240,7 @@ def process_midcap_sleeve(raw_data: dict[str, pd.DataFrame]):
                     if not DRY_RUN and quantity > 0:
                         place_order(pair, "SELL", quantity=quantity)
                     del ACTIVE_POSITIONS[pair]
+                    save_active_positions()
                     continue
 
                 # Rule 3: Profit-Gated Rank Rotation (Rank-out + Net Profit >= +0.30%)
@@ -221,6 +249,7 @@ def process_midcap_sleeve(raw_data: dict[str, pd.DataFrame]):
                     if not DRY_RUN and quantity > 0:
                         place_order(pair, "SELL", quantity=quantity)
                     del ACTIVE_POSITIONS[pair]
+                    save_active_positions()
                     continue
 
                 # Rule 4: 4-Hour Post 00:00 UTC Recovery Cutoff
@@ -230,6 +259,7 @@ def process_midcap_sleeve(raw_data: dict[str, pd.DataFrame]):
                     if not DRY_RUN and quantity > 0:
                         place_order(pair, "SELL", quantity=quantity)
                     del ACTIVE_POSITIONS[pair]
+                    save_active_positions()
                     continue
 
                 log.info("[MIDCAP] %s: Position active (In Top Rank: %s, Holding: %dm, Price: $%.4f, Stop: $%.4f, TP: $%.4f)", pair, is_in_top_rank, int(time_elapsed // 60), latest_price, stop_price, tp_price)
@@ -279,6 +309,7 @@ def process_midcap_sleeve(raw_data: dict[str, pd.DataFrame]):
             "quantity": coin_quantity,
             "sleeve": "midcap",
         }
+        save_active_positions()
 
         if not DRY_RUN:
             log.info("🚀 [MIDCAP LIVE ORDER] Executing BUY for %s: $%.2f USD (%.4f coins @ $%.2f)", pair, target_usd_cost, coin_quantity, latest_price)
