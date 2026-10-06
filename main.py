@@ -65,6 +65,60 @@ def save_active_positions():
         log.error("Failed to save active positions file: %s", e)
 
 
+def adopt_wallet_holdings(raw_data: dict[str, pd.DataFrame]):
+    """
+    Queries live Roostoo wallet balance (/v3/balance) and automatically adopts any existing 
+    wallet coin holdings (e.g. BNB, POL, ONDO, SEI, CFX) into ACTIVE_POSITIONS tracking.
+    This ensures NO forced selling at a loss; the bot will manage all current holdings 
+    using Rule 1 Volatility Stop-Loss and Rule 2 Take-Profit rules.
+    """
+    try:
+        resp = get_balance()
+        if not resp or not isinstance(resp, dict) or not resp.get("Success"):
+            return
+        wallet = resp.get("SpotWallet", {})
+        adopted_count = 0
+        for coin, info in wallet.items():
+            if coin == "USD":
+                continue
+            pair = f"{coin}/USD"
+            total_qty = float(info.get("Free", 0.0)) + float(info.get("Frozen", 0.0))
+            if total_qty <= 0:
+                continue
+
+            if pair not in ACTIVE_POSITIONS or ACTIVE_POSITIONS[pair].get("quantity", 0.0) < total_qty * 0.95:
+                latest_p = 1.0
+                if pair in raw_data and not raw_data[pair].empty:
+                    price_col = "close" if "close" in raw_data[pair].columns else "last_price"
+                    latest_p = float(raw_data[pair][price_col].iloc[-1])
+                    vol_24h = raw_data[pair][price_col].pct_change().rolling(1440, min_periods=5).std().iloc[-1]
+                    if vol_24h is None or np.isnan(vol_24h) or vol_24h <= 0:
+                        vol_24h = 0.001
+                else:
+                    vol_24h = 0.001
+
+                vol_dist = latest_p * vol_24h * np.sqrt(1440)
+                stop_p = latest_p - (2.0 * vol_dist)
+                tp_p = latest_p + (1.5 * vol_dist)
+                sleeve = "largecap" if pair in getattr(config, "LARGECAP_UNIVERSE", []) else "midcap"
+
+                ACTIVE_POSITIONS[pair] = {
+                    "entry_time": time.time(),
+                    "entry_price": latest_p,
+                    "stop_price": stop_p,
+                    "take_profit_price": tp_p,
+                    "quantity": total_qty,
+                    "sleeve": sleeve,
+                }
+                adopted_count += 1
+                log.info("🛡️ [ADOPTED HOLDING] Adopted live wallet holding for %s: %.4f coins @ $%.4f (Stop: $%.4f, TP: $%.4f)", pair, total_qty, latest_p, stop_p, tp_p)
+
+        if adopted_count > 0:
+            save_active_positions()
+    except Exception as e:
+        log.error("Failed to adopt wallet holdings: %s", e)
+
+
 # Track active open positions per pair (loaded from disk on startup)
 ACTIVE_POSITIONS = load_active_positions()
 
@@ -326,6 +380,9 @@ def run_once():
     if not raw:
         log.warning("No market data available yet.")
         return
+
+    # Adopt any existing live wallet holdings into ACTIVE_POSITIONS without forced selling
+    adopt_wallet_holdings(raw)
 
     # Process Sleeve 1 (12 Large-Cap Coins)
     process_largecap_sleeve(raw)
