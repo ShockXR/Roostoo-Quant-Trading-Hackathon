@@ -47,7 +47,7 @@ def fetch_binance_history(symbol: str, target_bars: int = 1500) -> pd.DataFrame:
 def seed_data_store():
     for pair, symbol in SYMBOLS.items():
         print(f"Fetching Binance 1m price history for {pair} ({symbol})...")
-        df = fetch_binance_history(symbol, limit=1000)
+        df = fetch_binance_history(symbol)
         safe_pair = pair.replace("/", "_")
         filepath = os.path.join(STORE_DIR, f"{safe_pair}.parquet")
         
