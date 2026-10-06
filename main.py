@@ -282,12 +282,29 @@ def is_in_cooldown(pair: str) -> bool:
     return False, 0
 
 
+MIDCAP_LEADERS_CACHE = {"timestamp": 0.0, "leaders": set(), "returns": {}}
+
+
+def get_cached_midcap_leaders(raw_data: dict[str, pd.DataFrame], pairs: list[str]) -> tuple[set[str], dict[str, float]]:
+    """Caches mid-cap momentum leaders for 1 hour to filter out 1m micro-noise while enabling 24/7 intraday profit recycling."""
+    now = time.time()
+    interval_secs = getattr(config, "MIDCAP_RANK_UPDATE_INTERVAL_MINUTES", 60) * 60
+    if (now - MIDCAP_LEADERS_CACHE["timestamp"] >= interval_secs) or not MIDCAP_LEADERS_CACHE["leaders"]:
+        leaders, returns = get_top_midcap_leaders(raw_data, pairs)
+        if leaders:
+            MIDCAP_LEADERS_CACHE["timestamp"] = now
+            MIDCAP_LEADERS_CACHE["leaders"] = leaders
+            MIDCAP_LEADERS_CACHE["returns"] = returns
+            log.info("📊 [HOURLY MIDCAP RANK UPDATE] Refreshed top momentum leaders: %s", sorted(list(leaders)))
+    return MIDCAP_LEADERS_CACHE["leaders"], MIDCAP_LEADERS_CACHE["returns"]
+
+
 def process_midcap_sleeve(raw_data: dict[str, pd.DataFrame]):
     """Processes Sleeve 2 (11 Mid-Cap Coins) using blend_v10 Dual Momentum + Profit-Gated Rank Rotation."""
     midcap_pairs = getattr(config, "MIDCAP_UNIVERSE", [])
     account_equity = getattr(config, "INITIAL_CAPITAL", 100000.0)
 
-    top_leaders, returns_24h = get_top_midcap_leaders(raw_data, midcap_pairs)
+    top_leaders, returns_24h = get_cached_midcap_leaders(raw_data, midcap_pairs)
 
     for pair in midcap_pairs:
         if pair not in raw_data or raw_data[pair].empty:

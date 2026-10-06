@@ -136,6 +136,7 @@ SLOW_CONSOLIDATING_MIDCAPS = [
 ]
 SLOW_MIDCAP_EXPIRY_HOURS = 12        # 12 Hours recovery window for slower consolidating mid-caps
 FAST_MIDCAP_EXPIRY_HOURS = 4         # 4 Hours recovery window for fast-recovering mid-caps
+MIDCAP_RANK_UPDATE_INTERVAL_MINUTES = 60 # Hourly mid-cap momentum rank updates (filters 1m micro-noise while allowing 24/7 intraday trade recycling)
 POST_STOP_LOSS_COOLDOWN_HOURS = 2    # 2 Hours post-stop-loss cool-down lockout before re-entry
 SIZING_REFERENCE_VOL = 0.0006
 
