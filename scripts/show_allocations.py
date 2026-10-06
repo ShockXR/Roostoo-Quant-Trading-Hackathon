@@ -33,14 +33,22 @@ def main():
     wallet = resp.get("SpotWallet", {})
     free_usd = float(wallet.get("USD", {}).get("Free", 0.0))
 
-    # Fetch live ticker prices for evaluation
+    # Fetch live ticker prices for evaluation (with local parquet fallback)
     ticker_resp = get_ticker()
     prices = {}
-    if ticker_resp and isinstance(ticker_resp, dict) and ticker_resp.get("Success"):
-        for item in ticker_resp.get("TickerList", []):
-            pair = item.get("pair")
-            price = float(item.get("last_price", 0.0))
-            prices[pair] = price
+    if ticker_resp and isinstance(ticker_resp, dict):
+        ticker_list = ticker_resp.get("TickerList", []) or ticker_resp.get("tickerList", [])
+        if isinstance(ticker_list, dict):
+            ticker_list = [ticker_list]
+        for item in ticker_list:
+            if isinstance(item, dict):
+                p = item.get("pair") or item.get("Pair") or item.get("symbol") or item.get("Symbol")
+                val = item.get("last_price") or item.get("LastPrice") or item.get("price") or item.get("Price") or 0.0
+                if p:
+                    try:
+                        prices[p] = float(val)
+                    except (ValueError, TypeError):
+                        pass
 
     print(f"{'COIN':<8} | {'SLEEVE':<10} | {'EXACT QUANTITY':<18} | {'LIVE PRICE':<12} | {'USD VALUE':<14}")
     print("---------------------------------------------------------------------------------------")
@@ -61,6 +69,19 @@ def main():
             continue
 
         live_price = prices.get(pair, 0.0)
+
+        # Fallback to data_store/*.parquet if ticker price is 0
+        if live_price == 0.0:
+            safe = pair.replace("/", "_")
+            p_file = os.path.join(getattr(config, "STORE_DIR", "data_store"), f"{safe}.parquet")
+            if os.path.exists(p_file):
+                try:
+                    df_p = pd.read_parquet(p_file)
+                    if not df_p.empty:
+                        col = "close" if "close" in df_p.columns else "last_price"
+                        live_price = float(df_p[col].iloc[-1])
+                except Exception:
+                    pass
         usd_val = total_qty * live_price
         total_coins_usd += usd_val
 
