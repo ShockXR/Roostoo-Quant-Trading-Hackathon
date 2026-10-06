@@ -138,6 +138,23 @@ SLOW_MIDCAP_EXPIRY_HOURS = 12        # 12 Hours recovery window for slower conso
 FAST_MIDCAP_EXPIRY_HOURS = 4         # 4 Hours recovery window for fast-recovering mid-caps
 MIDCAP_RANK_UPDATE_INTERVAL_MINUTES = 60 # Hourly mid-cap momentum rank updates (filters 1m micro-noise while allowing 24/7 intraday trade recycling)
 POST_STOP_LOSS_COOLDOWN_HOURS = 2    # 2 Hours post-stop-loss cool-down lockout before re-entry
+# --- Separate Dynamic Trailing Profit Ratchets ---
+# Large-Cap Ratchet (Precision Tighter Locking for Lower-Volatility Majors)
+LARGECAP_TRAILING_RATCHETS = [
+    (1.0040, 1.0025),  # Peak +0.40% -> Lock +0.25% floor (+0.05% Net Profit)
+    (1.0080, 1.0055),  # Peak +0.80% -> Lock +0.55% floor (+0.35% Net Profit)
+    (1.0150, 1.0110),  # Peak +1.50% -> Lock +1.10% floor (+0.90% Net Profit)
+    (1.0250, 1.0190),  # Peak +2.50% -> Lock +1.90% floor (+1.70% Net Profit)
+]
+
+# Mid-Cap Ratchet (Wider High-Growth Locking for Higher-Volatility Mid-Caps)
+MIDCAP_TRAILING_RATCHETS = [
+    (1.0070, 1.0045),  # Peak +0.70% -> Lock +0.45% floor (+0.25% Net Profit)
+    (1.0150, 1.0100),  # Peak +1.50% -> Lock +1.00% floor (+0.80% Net Profit)
+    (1.0300, 1.0220),  # Peak +3.00% -> Lock +2.20% floor (+2.00% Net Profit)
+    (1.0500, 1.0380),  # Peak +5.00% -> Lock +3.80% floor (+3.60% Net Profit)
+]
+
 SIZING_REFERENCE_VOL = 0.0006
 
 # --- Component switches (used by the ablation harness) ---

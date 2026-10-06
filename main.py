@@ -148,18 +148,45 @@ def process_largecap_sleeve(raw_data: dict[str, pd.DataFrame]):
             tp_price = pos.get("take_profit_price", latest_price * 1.05)
             quantity = pos.get("quantity", 0.0)
 
+            # Track highest peak price reached
+            highest_price = max(pos.get("highest_price", entry_price), latest_price)
+            pos["highest_price"] = highest_price
+
             hold_secs = getattr(config, "REVERSAL_HOLD_BARS", 1440) * 60
             time_elapsed = time.time() - entry_time
 
-            # Rule 1: Volatility Stop-Loss Exit (2 * Volatility distance)
+            # Rule 1: Volatility Stop-Loss Exit (3.0 * Volatility distance)
             if latest_price <= stop_price:
-                log.warning("🚨 [LARGECAP RULE 1: STOP-LOSS] %s: Price $%.4f dropped below Stop-Loss $%.4f (2x Vol). Executing SELL.", pair, latest_price, stop_price)
+                log.warning("🚨 [LARGECAP RULE 1: STOP-LOSS] %s: Price $%.4f dropped below Stop-Loss $%.4f (3x Vol). Executing SELL.", pair, latest_price, stop_price)
                 if not DRY_RUN and quantity > 0:
                     place_order(pair, "SELL", quantity=quantity)
                 del ACTIVE_POSITIONS[pair]
+                save_active_positions()
                 continue
 
-            # Rule 2: Take-Profit Target Exit (Guarantees fee coverage: +0.30% minimum)
+            # Dynamic Trailing Profit Ratchet Check for Large-Caps
+            largecap_ratchets = getattr(config, "LARGECAP_TRAILING_RATCHETS", [])
+            highest_ratio = highest_price / max(1e-6, entry_price)
+            trailing_floor_price = 0.0
+            active_tier_name = ""
+
+            for peak_mult, floor_mult in reversed(largecap_ratchets):
+                if highest_ratio >= peak_mult:
+                    trailing_floor_price = entry_price * floor_mult
+                    locked_net_pct = (floor_mult - 1.0020) * 100.0
+                    active_tier_name = f"+{(peak_mult - 1.0)*100:.2f}% Peak -> +{locked_net_pct:.2f}% Net Floor"
+                    break
+
+            if trailing_floor_price > 0.0 and latest_price <= trailing_floor_price:
+                locked_net_pct = ((latest_price - entry_price) / max(1e-6, entry_price) - 0.0020) * 100.0
+                log.info("🎯 [LARGECAP TRAILING RATCHET PROFIT] %s: Price $%.4f hit Trailing Floor $%.4f (%s, Entry: $%.4f). Executing SELL (Net PnL: +%.2f%%).", pair, latest_price, trailing_floor_price, active_tier_name, entry_price, locked_net_pct)
+                if not DRY_RUN and quantity > 0:
+                    place_order(pair, "SELL", quantity=quantity)
+                del ACTIVE_POSITIONS[pair]
+                save_active_positions()
+                continue
+
+            # Rule 2: Take-Profit Target Exit
             min_fee_tp = entry_price * 1.003
             target_sell_price = max(tp_price, min_fee_tp)
 
@@ -168,6 +195,7 @@ def process_largecap_sleeve(raw_data: dict[str, pd.DataFrame]):
                 if not DRY_RUN and quantity > 0:
                     place_order(pair, "SELL", quantity=quantity)
                 del ACTIVE_POSITIONS[pair]
+                save_active_positions()
                 continue
 
             # Rule 3: Time Expiry
@@ -176,6 +204,7 @@ def process_largecap_sleeve(raw_data: dict[str, pd.DataFrame]):
                 if not DRY_RUN and quantity > 0:
                     place_order(pair, "SELL", quantity=quantity)
                 del ACTIVE_POSITIONS[pair]
+                save_active_positions()
                 continue
 
             else:
@@ -324,6 +353,10 @@ def process_midcap_sleeve(raw_data: dict[str, pd.DataFrame]):
                 tp_price = pos.get("take_profit_price", latest_price * 1.05)
                 quantity = pos.get("quantity", 0.0)
 
+                # Track highest peak price reached for Mid-Cap
+                highest_price = max(pos.get("highest_price", entry_price), latest_price)
+                pos["highest_price"] = highest_price
+
                 time_elapsed = time.time() - entry_time
                 is_in_top_rank = pair in top_leaders
 
@@ -335,6 +368,28 @@ def process_midcap_sleeve(raw_data: dict[str, pd.DataFrame]):
                     del ACTIVE_POSITIONS[pair]
                     save_active_positions()
                     record_cooldown(pair, hours=getattr(config, "POST_STOP_LOSS_COOLDOWN_HOURS", 2.0))
+                    continue
+
+                # Dynamic Trailing Profit Ratchet Check for Mid-Caps
+                midcap_ratchets = getattr(config, "MIDCAP_TRAILING_RATCHETS", [])
+                highest_ratio = highest_price / max(1e-6, entry_price)
+                trailing_floor_price = 0.0
+                active_tier_name = ""
+
+                for peak_mult, floor_mult in reversed(midcap_ratchets):
+                    if highest_ratio >= peak_mult:
+                        trailing_floor_price = entry_price * floor_mult
+                        locked_net_pct = (floor_mult - 1.0020) * 100.0
+                        active_tier_name = f"+{(peak_mult - 1.0)*100:.2f}% Peak -> +{locked_net_pct:.2f}% Net Floor"
+                        break
+
+                if trailing_floor_price > 0.0 and latest_price <= trailing_floor_price:
+                    locked_net_pct = ((latest_price - entry_price) / max(1e-6, entry_price) - 0.0020) * 100.0
+                    log.info("🎯 [MIDCAP TRAILING RATCHET PROFIT] %s: Price $%.4f hit Trailing Floor $%.4f (%s, Entry: $%.4f). Executing SELL (Net PnL: +%.2f%%).", pair, latest_price, trailing_floor_price, active_tier_name, entry_price, locked_net_pct)
+                    if not DRY_RUN and quantity > 0:
+                        place_order(pair, "SELL", quantity=quantity)
+                    del ACTIVE_POSITIONS[pair]
+                    save_active_positions()
                     continue
 
                 # Rule 2: Mid-Cap Fee-Protected Take Profit

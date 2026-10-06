@@ -48,15 +48,17 @@ def get_sell_reasoning(pair: str, sell_timestamp: str) -> str:
         for line in reversed(lines):
             if coin_name in line and ("Executing SELL" in line or "TRIGGERED" in line):
                 if "RULE 1: STOP-LOSS" in line or "STOP-LOSS TRIGGERED" in line:
-                    return "🚨 Rule 1: Volatility Stop-Loss (-2.0σ / -2.5σ)"
+                    return "🚨 Rule 1: Volatility Stop-Loss"
+                elif "TRAILING RATCHET PROFIT" in line:
+                    return "📈 Dynamic Trailing Profit Ratchet Hit"
                 elif "RULE 2: TAKE-PROFIT" in line or "TAKE-PROFIT TRIGGERED" in line:
-                    return "🎯 Rule 2: Fee-Protected Take-Profit (+1.5σ / +0.30% min)"
+                    return "🎯 Rule 2: Take-Profit Target Hit"
                 elif "RULE 3: 24H HOLD" in line or "HOLD COMPLETED" in line:
                     return "⏰ Rule 3: 24h Time Expiry Limit"
                 elif "PROFIT-GATED RANK ROTATION" in line:
                     return "🔄 Rule 3: Profit-Gated Rank Rotation (+0.30% min gain)"
-                elif "4-HOUR EXPIRY" in line:
-                    return "⏰ Rule 4: Mid-Cap 4-Hour Recovery Window Expiry"
+                elif "EXPIRY" in line:
+                    return "⏰ Rule 4: Dynamic Mid-Cap Recovery Window Expiry"
     except Exception:
         pass
 
@@ -111,6 +113,34 @@ def get_live_price(pair: str, ticker_prices: dict) -> float:
         pass
 
     return 0.0
+
+
+def get_historical_price_at_timestamp(pair: str, ts_str: str, ticker_prices: dict) -> float:
+    """Resolves historical price at trade timestamp from parquet store -> active_positions -> live ticker."""
+    safe = pair.replace("/", "_")
+    p_file = os.path.join(STORE_DIR, f"{safe}.parquet")
+    if os.path.exists(p_file):
+        try:
+            df_p = pd.read_parquet(p_file)
+            if not df_p.empty:
+                col = "close" if "close" in df_p.columns else ("last_price" if "last_price" in df_p.columns else df_p.columns[-1])
+                try:
+                    ts_val = pd.to_datetime(ts_str)
+                    if "timestamp" in df_p.columns:
+                        dt_series = pd.to_datetime(df_p["timestamp"], unit="s" if df_p["timestamp"].max() < 2e9 else "ms", errors="coerce")
+                        idx = (dt_series - ts_val).abs().idxmin()
+                        val = float(df_p.loc[idx, col])
+                        if val > 0:
+                            return val
+                except Exception:
+                    pass
+                val = float(df_p[col].iloc[-1])
+                if val > 0:
+                    return val
+        except Exception:
+            pass
+
+    return get_live_price(pair, ticker_prices)
 
 
 def analyze():
@@ -240,14 +270,14 @@ def analyze():
                         price = 0.0
 
                     if price <= 0.0:
-                        price = get_live_price(pair, prices)
+                        price = get_historical_price_at_timestamp(pair, ts, prices)
 
                     if side == "BUY":
                         buy_stack.append((qty, price, ts))
                     elif side == "SELL" and buy_stack:
                         b_qty, b_price, b_ts = buy_stack.pop(0)
                         if b_price <= 0.0:
-                            b_price = price
+                            b_price = get_historical_price_at_timestamp(pair, b_ts, prices)
 
                         if price > 0 and b_price > 0:
                             gross_val_entry = b_price * qty
