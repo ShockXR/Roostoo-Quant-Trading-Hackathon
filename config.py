@@ -62,17 +62,23 @@ UNIVERSE_GROUPS = {
     ],
 }
 
-# Active trading universe -- 12 major liquid coins
-UNIVERSE = [
+# Sleeve 1: 12 Large-Cap Liquid Coins
+LARGECAP_UNIVERSE = [
     "BTC/USD", "ETH/USD", "SOL/USD", "BNB/USD", "XRP/USD", "ADA/USD",
     "DOGE/USD", "LINK/USD", "AVAX/USD", "DOT/USD", "LTC/USD", "SUI/USD"
 ]
+
+# Sleeve 2: 11 Mid-Cap Coins
+MIDCAP_UNIVERSE = [
+    "UNI/USD", "AAVE/USD", "CRV/USD", "PENDLE/USD", "CAKE/USD",
+    "ONDO/USD", "ENA/USD", "ARB/USD", "POL/USD", "SEI/USD", "CFX/USD"
+]
+
+# Total Combined Active Trading Universe (23 Coins)
+UNIVERSE = LARGECAP_UNIVERSE + MIDCAP_UNIVERSE
 MARKET_PROXY = "BTC/USD"  # used for "return relative to market" features
 
 # --- Data collection ---
-# Competition explicitly forbids HFT / market-making / arbitrage and warns
-# that excessive requests fail. Keep this slow and deliberate -- there is
-# no benefit to polling faster than your actual decision horizon anyway.
 POLL_INTERVAL_SECONDS = 60      # how often we hit /v3/ticker (1 min)
 STORE_DIR = "data_store"        # local parquet files, one per pair
 
@@ -97,7 +103,6 @@ REGIME_TREND_WINDOW = 30
 
 # --- Target construction ---
 TARGET_HORIZON = 10          # bars ahead we're predicting (tune with POLL_INTERVAL)
-# threshold should be > round-trip cost + margin (see COST section below)
 TARGET_MODE = "threshold"    # "regression" | "direction" | "threshold"
 
 # --- Transaction costs: CONFIRMED from hackathon rules ---
@@ -107,20 +112,25 @@ ROUND_TRIP_COST_ESTIMATE = TAKER_FEE * 2   # worst case, two taker fills
 SLIPPAGE_ESTIMATE = 0.0003                   # placeholder, refine from real fills -- mock exchange may have low slippage
 SAFETY_MARGIN = 0.0003                        # extra edge required beyond costs
 TARGET_THRESHOLD = ROUND_TRIP_COST_ESTIMATE + SLIPPAGE_ESTIMATE + SAFETY_MARGIN
-# Prefer LIMIT (maker) orders where the strategy allows resting an order --
-# maker fee is half the taker fee, which matters a lot at this trade frequency.
 
-# --- Position sizing & Risk Exits ---
-MAX_POSITION_PER_ASSET = 0.08    # 8% max per coin (12 coins * 8% = 96% max, bounded by 70% total portfolio exposure)
-MAX_PORTFOLIO_EXPOSURE = 0.70     # 70% fraction of capital deployed at once (30% cash buffer preserved)
-MAX_TRADES_PER_HOUR = 20
-MAX_DRAWDOWN_KILL_SWITCH = 0.12   # Calmar = return / max drawdown, so capping drawdown directly protects this metric
-MIN_CONFIDENCE_TO_TRADE = 0.55     # model probability threshold to act at all
-SIZING_REFERENCE_VOL = 0.0006
+# --- Portfolio Fund Allocation ($100,000 USD Total Equity) ---
+LARGECAP_MAX_EXPOSURE = 0.50     # 50% ($50,000 USD max deployment for Large-Caps)
+MIDCAP_MAX_EXPOSURE = 0.20       # 20% ($20,000 USD dedicated deployment for Mid-Caps)
+CASH_RESERVE_BUFFER = 0.30       # 30% ($30,000 USD preserved cash buffer reserve)
+MAX_PORTFOLIO_EXPOSURE = 0.70     # 70% total portfolio exposure cap
+MIN_CONFIDENCE_TO_TRADE = 0.55     # model probability threshold
 
-# Volatility-based Risk & Exit Multipliers
+# Sleeve 1 (Large-Caps) Parameters
+MAX_POSITION_PER_ASSET = 0.08    # 8% max per large-cap coin
 STOP_LOSS_K = 2.0                # Exit if price drops by > 2 * Volatility distance (Rule 1)
-TAKE_PROFIT_K = 1.5              # Exit if price gains > 1.5 * Volatility distance or reaches 24h MA (Rule 2)
+TAKE_PROFIT_K = 1.5              # Exit if price gains > 1.5 * Volatility distance (Rule 2)
+
+# Sleeve 2 (Mid-Caps) Parameters
+MIDCAP_MAX_POSITION_PER_ASSET = 0.05 # 5% max per mid-cap coin ($5,000 USD)
+MIDCAP_STOP_LOSS_K = 2.5             # Exit if mid-cap price drops by > 2.5 * Volatility (Rule 1)
+MIDCAP_TAKE_PROFIT_K = 2.0           # Exit if mid-cap price gains > 2.0 * Volatility (Rule 2)
+MIDCAP_RANK_OUT_EXPIRY_HOURS = 4     # 4 Hours post 00:00 UTC rebalance recovery cutoff (Rule 4)
+SIZING_REFERENCE_VOL = 0.0006
 
 # --- Component switches (used by the ablation harness) ---
 COMPONENTS = {

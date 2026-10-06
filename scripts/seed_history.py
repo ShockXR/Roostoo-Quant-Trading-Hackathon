@@ -10,6 +10,7 @@ STORE_DIR = "data_store"
 os.makedirs(STORE_DIR, exist_ok=True)
 
 SYMBOLS = {
+    # Sleeve 1: Large-Caps (12 Coins)
     "BTC/USD": "BTCUSDT",
     "ETH/USD": "ETHUSDT",
     "SOL/USD": "SOLUSDT",
@@ -22,6 +23,19 @@ SYMBOLS = {
     "DOT/USD": "DOTUSDT",
     "LTC/USD": "LTCUSDT",
     "SUI/USD": "SUIUSDT",
+
+    # Sleeve 2: Mid-Caps (11 Coins)
+    "UNI/USD": "UNIUSDT",
+    "AAVE/USD": "AAVEUSDT",
+    "CRV/USD": "CRVUSDT",
+    "PENDLE/USD": "PENDLEUSDT",
+    "CAKE/USD": "CAKEUSDT",
+    "ONDO/USD": "ONDOUSDT",
+    "ENA/USD": "ENAUSDT",
+    "ARB/USD": "ARBUSDT",
+    "POL/USD": "POLUSDT",
+    "SEI/USD": "SEIUSDT",
+    "CFX/USD": "CFXUSDT",
 }
 
 
