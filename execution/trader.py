@@ -100,8 +100,12 @@ def format_quantity(pair: str, qty: float) -> str:
         return f"{qty:.4f}"
     elif "ETH" in pair:
         return f"{qty:.3f}"
+    elif qty >= 100:
+        return f"{int(qty)}"  # Low-priced altcoins (ONDO, SEI, CFX, POL, DOGE) require integer step size
+    elif qty >= 10:
+        return f"{qty:.1f}"
     else:
-        return f"{qty:.2f}"  # BNB, SOL, XRP, ADA
+        return f"{qty:.2f}"
 
 
 def place_order(pair: str, side: str, quantity: float, price: float | None = None):
