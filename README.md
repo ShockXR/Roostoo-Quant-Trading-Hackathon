@@ -1,81 +1,134 @@
-# Roostoo bot: offline validation and paper operation
+# Roostoo mid-cap momentum bot
 
-This checkout now contains regression fixes and deterministic fixtures for the original draft. `DRY_RUN=True`, `LIVE_TRADING_ENABLED=False`, and `ALLOW_SHORTS=False` remain the defaults. No historical profitability, organizer score parity, or actual exchange-fill behavior has been established.
+An autonomous, long-only trading bot for the Roostoo Quant Trading Hackathon. It trades 17 mid-cap cryptocurrencies on the Roostoo exchange API with a daily-rebalanced momentum strategy, sized for steady, low-drawdown returns because the competition score rewards risk-adjusted performance.
 
-## Install and verify
+**Status (2026-10-05, update before submission).** The strategy is implemented, unit-tested, backtested on Binance history and replayed through the live engine. It has run in paper mode against live prices. It is not yet placing real orders on the competition account: live trading is switched on by a separate, recorded commit after a paper run on the deployment instance (see [DEPLOYMENT.md](DEPLOYMENT.md) and [docs/LIVE_READINESS.md](docs/LIVE_READINESS.md)). Everything below about performance is historical simulation with assumed costs, not live results.
 
-Python 3.10 or newer is required. From the repository root:
+## Strategy overview
 
-```sh
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python -m unittest discover -s tests -t . -v
-python analysis/audit_bot.py
+**Idea.** Over horizons of one to seven days, mid-cap crypto assets that have recently outperformed tended to keep outperforming in our 2026 test data (cross-sectional momentum), while short-horizon reversal lost in every configuration we tried. The bot buys the strongest recent performers, weights them by inverse volatility, keeps total risk to a fixed daily-volatility target, and sits in cash when nothing is trending.
+
+**Scoring context.** Competition score = `0.4 * Sortino + 0.3 * Sharpe + 0.3 * Calmar`, with Sharpe sampled daily. All three penalize losing days and drawdown, so the design favors small, diversified, volatility-targeted positions over maximum return. Details of how we compute the score locally are in [scoring.py](scoring.py).
+
+**Key features**
+- Daily rebalance at 00:00 UTC; positions are held between rebalances (no high-frequency trading).
+- Long-only, no leverage, market orders only.
+- Staged drawdown de-risk that cuts size automatically and never goes to zero, so the bot keeps trading every day.
+- State, equity and every fill are logged; restarts resume from saved state.
+- Signals come from Binance hourly candles (Roostoo prices stream from Binance); execution and balances come from the Roostoo API.
+
+## Architecture
+
+```
+Binance public klines (1h)          Roostoo API (/v3/ticker, /v3/balance, /v3/place_order ...)
+        |                                        |
+ data/binance_live.py                    execution/trader.py  (signing, rate limit, no blind retries)
+        |                                        |
+ strategies/midcap.py  --targets-->  midcap_live.py (MidcapEngine) --orders--> execution/broker.py (LiveBroker)
+ (signals, sizing, overlays)           |  daily rebalance, drawdown de-risk,      or PaperBroker (simulated fills)
+                                       |  restart-safe state
+                                       +--> logs/events.jsonl, logs/equity.jsonl, data_store/*.json
 ```
 
-`requirements.txt` installs the package in editable mode. The documented `python -m roostoo_bot.main` service command therefore resolves correctly. The fixture suite uses temporary storage and blocks network connections. It never sends real orders.
+| Component | File |
+|---|---|
+| Strategy: momentum signals, volatility target, caps, overlays | [strategies/midcap.py](strategies/midcap.py) |
+| Live/paper runner: schedule, drawdown de-risk, state | [midcap_live.py](midcap_live.py) |
+| Engine shared with the earlier runner: reconcile, order loop, persistence | [main.py](main.py) |
+| Binance hourly data for the live signal | [data/binance_live.py](data/binance_live.py) |
+| Roostoo API client (HMAC signing, 30 calls/min budget) | [execution/trader.py](execution/trader.py), [execution/auth.py](execution/auth.py) |
+| Live broker (reconciles wallet each cycle) and paper broker | [execution/broker.py](execution/broker.py), [execution/portfolio.py](execution/portfolio.py) |
+| Competition score (daily Sortino, Sharpe, Calmar) | [scoring.py](scoring.py), [scripts/live_score.py](scripts/live_score.py) |
+| Multi-asset hourly backtester | [backtest/portfolio.py](backtest/portfolio.py) |
+| Research grid and history replay through the live engine | [scripts/midcap_research.py](scripts/midcap_research.py), [scripts/shadow_replay.py](scripts/shadow_replay.py) |
+| Binance history downloader | [binance_downloader.py](binance_downloader.py) |
 
-`analysis/audit_results_baseline.json` preserves the original 33-check audit at commit `3aa87f5`. `analysis/audit_results.json` records the current fixture results, file hashes, dependency versions and updated handbook coverage. Passing fixtures verifies these contracts; it does not measure strategy profitability.
+Tech stack: Python 3.10+, pandas, numpy, requests; Binance public market data; designed to run on AWS EC2 (Sydney) under systemd. The repository also holds an earlier model-based pipeline for large-cap coins (`features/`, `model/`, `--strategy model`); the mid-cap strategy does not use it. It is described in [docs/OFFLINE_VALIDATION.md](docs/OFFLINE_VALIDATION.md).
 
-## What changed
+## Strategy in detail
 
-- Unknown classification outcomes stay missing. Training, validation and internal probability calibration have horizon-sized gaps, with actual label-availability timestamps checked at the boundaries.
-- Training-only conditional returns translate class probabilities into signed expected returns. Class 0 retains its signed average return instead of being assumed to mean a loss. Return regression uses a regressor.
-- Models carry their feature order, pair, training information cutoff, source/config fingerprint, runtime versions and a checksum manifest. Inference rejects missing/nonfinite features instead of dropping columns. Raw optional ticker fields and unnormalized moving-average levels are excluded from ML.
-- The sequential backtest delays execution by one observation, uses the paper cash/units ledger and charges terminal liquidation costs. Starting equity is part of the drawdown peak. Sortino uses zero-target RMS downside over all observations; ratios are research conventions pending organizer verification. Positive bars are not mislabeled as winning closed trades.
-- Ablations use identical out-of-sample timestamps and one classifier family. Regime features, expected-return filtering and sizing are added separately. Insufficient or noncontiguous evaluation data raises an error rather than reporting a misleading zero-trade result.
-- The runner plans changes from reconciled holdings, converts capital fractions to rounded quantities, checks notional minimums, reserves cash for fees, caps gross exposure and prioritizes reductions. Direction flips close first, then consider a new position on a later quote.
-- Drawdown halts, hourly order reservations and duplicate-quote suppression persist with paper cash/positions across restarts. API requests have a shared budget. Order POSTs are not retried after ambiguous failures. Pending/partial/uncertain fills stop further orders; the uncertainty marker is saved before submission.
-- Shorts have separate collateral, entry and close accounting using the official `/v6` interfaces. They are disabled by default until this account's competition permission is verified. A spot SELL only reduces an existing long.
-- Exact duplicate ticks are removed, conflicting duplicates rejected and parquet writes replaced atomically. Old cross-sectional quotes expire; rankings stay within the configured asset group. The runner rejects stale/future quotes and recent history gaps.
-- `scripts/test_min_order.py` is now read-only. It cannot accidentally place a one-BTC market order.
+**Universe (17 pairs).** ENA, FET, WLD, UNI, TAO, ONDO, AAVE, VIRTUAL, HBAR, ARB, ICP, FIL, SEI, APT, ASTER, XLM, PUMP (all `/USD` on Roostoo). Chosen from the Roostoo pairs by 24h volume and bid/ask spread on 2026-10-05: about $8-53M of 24h volume on Roostoo and spreads under 5bp. BTC, ETH, memecoins, thinly traded pairs and tokenized stocks are excluded. The list was picked with knowledge of today's volumes, which flatters historical tests slightly.
 
-## Train artifacts from historical data
+**Signal (computed once a day from the closed 00:00 UTC hourly candle).** Two momentum sleeves, averaged:
+1. 24-hour lookback: the 5 coins with the highest 24h return.
+2. 168-hour lookback: the 3 coins with the highest 7-day return.
 
-Store cleaned ticker histories in `data_store/`. Required columns are UTC epoch-millisecond `timestamp`, `last_price`, `max_bid`, and `min_ask`. The current features and prediction horizon count observations, not guaranteed wall-clock minutes or OHLCV candles; clean and align the research sampling cadence before interpreting annualized metrics.
+A coin only qualifies if its return over the lookback is positive; if fewer than 2x the sleeve size have data, that sleeve is empty. Within each sleeve, qualifying coins are weighted by inverse volatility (standard deviation of hourly returns over the last 168 hours). If neither sleeve has a qualifying coin, the bot holds cash; if only one does, the volatility target below sets the size.
 
-Choose and record a training cutoff strictly before the validation/final-test periods. Replace `TRAIN_END_MS` below with that integer timestamp:
+**Entry and exit.** The bot enters or adds to a coin when the new daily targets give it a larger weight, and exits or trims when the coin drops out of the top group or its lookback return turns non-positive. Trades happen only at the daily rebalance (and for drawdown cuts, below). Per-coin changes smaller than 1% of equity are skipped, except exits to zero.
+
+**Position sizing.** The averaged weights are scaled so the predicted daily volatility of the portfolio (from the covariance of the last 168 hourly returns) is at most a target of 1.5%, with at most 20% of equity in any coin and at most 70% of equity invested in total. In quiet markets the exposure reaches the 70% cap; in volatile markets it shrinks. No leverage.
+
+**Risk management**
+- *Drawdown schedule* (measured from the equity high-water mark, checked every minute): beyond a 3% drawdown the bot cuts positions to half of target, beyond 6% to 30% of target. Cuts are traded immediately. Size returns to full only at the next daily rebalance after drawdown has recovered. The bot is never fully halted by this rule, so it stays active every day, as the competition requires.
+- *Order safety:* orders use quantities rounded to each pair's lot size and respect the venue minimum order size; reductions execute before additions; wallet balances are re-read from the exchange every cycle, so the bot trusts the exchange state rather than its own bookkeeping.
+- *Failure handling:* a timeout or partial fill is never assumed to be a fill (the next cycle reconciles against the wallet before trading again); an order the exchange rejects is skipped and the other coins still trade; stale or missing quotes stop the cycle; if the signal data is unavailable the bot holds its positions and retries.
+- *API budget:* about 4 calls per idle minute and 7 per order, under the 30 calls/minute limit.
+
+**Assumptions**
+- Taker fee 0.10% and about 0.05% slippage plus spread per side in backtests (0.15% total), with a 2x cost stress test. The real fee has not yet been verified on the competition account.
+- Fills at the price 2 to 5 minutes after the signal hour, never at the signal price.
+- Shorting is not used (permission on our keys is unconfirmed, and long/short momentum tested worse).
+
+## Results (historical simulation, not live)
+
+Data: Binance spot 1-minute candles for the 17 coins, 2026-04-01 to 2026-10-04, resampled to hourly. Backtests start flat with $100k, use the costs above, and score fresh 14-day windows the length of the competition. A test confirms strategy weights at any hour are unchanged when later data is removed (no look-ahead). Full method and caveats: [docs/MIDCAP_RESEARCH.md](docs/MIDCAP_RESEARCH.md).
+
+| Period | Market (equal-weight hold of the 17 coins) | Strategy, live configuration | Max drawdown over the period |
+|---|---|---|---|
+| Apr 8 - Aug 1 (selection) | -5.7% | +13.2% | -6.0% |
+| August | +21.3% | +7.8% | -4.1% |
+| Sep 1 - Oct 4 | +48.3% | +4.2% (+7.1% replayed through the live engine) | -5.0% |
+
+Across twelve 14-day windows from April to October, the live engine's average return was 2.1% per window with a worst drawdown of -4.7%, versus 3.3% and -6.9% without the drawdown schedule. Return figures include costs.
+
+Read these carefully:
+- The strategy is built to be steady, so it lags badly in strong rallies and protects capital in falling markets.
+- Forty-seven configurations were tried; the best selection-period numbers are inflated by that. The September-October period was used once to confirm a one-percent-volatility variant, so it is not a clean out-of-sample test for the final 1.5% configuration, which differs.
+- Annualized ratios over 14 days are very sensitive to how the organizers annualize; see [docs/ORGANIZER_QUESTIONS.md](docs/ORGANIZER_QUESTIONS.md) for the open questions.
+
+## Setup and run
+
+Requires Python 3.10 or newer.
 
 ```sh
-python -m roostoo_bot.model.train --pair BTC/USD --train-end-ms TRAIN_END_MS --model logistic --output models/BTC_USD.joblib
+git clone https://github.com/ShockXR/Roostoo-Quant-Trading-Hackathon
+cd Roostoo-Quant-Trading-Hackathon
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt          # installs the package in editable mode
+cp .env.example .env                     # add ROOSTOO_API_KEY and ROOSTOO_API_SECRET (live only)
+python -m unittest discover -s tests -t . -v      # offline tests, no network, no orders
+python -m roostoo_bot.main --strategy midcap      # paper mode (default): public ticker, simulated fills
 ```
 
-The CLI reads only history at/before the cutoff and discards labels that would need later data. It saves a model and checksum manifest; it reports no out-of-sample score. Use only locally generated/trusted joblib artifacts, which use pickle serialization. Train a separate artifact for each desired asset; an asset without a model cannot open new risk. Changing features, their source, the universe or label settings requires retraining. Artifact loading checks Python/library versions before deserialization; train with the deployment runtime or install matching dependencies.
+Paper mode needs no keys and never sends orders. Live trading needs two deliberate code changes (`DRY_RUN = False` in `main.py`, `LIVE_TRADING_ENABLED = True` in `config.py`) plus the competition keys. Deployment on EC2, the pre-live checklist and daily operation are in [DEPLOYMENT.md](DEPLOYMENT.md).
 
-## Binance research tools
+**Monitor.** `python -m roostoo_bot.scripts.live_score --mode live` prints the running composite score, its parts, max drawdown and fills per day (the competition requires at least 8 active trading days). Logs: `logs/events.jsonl` (every fill with price, quantity, fee and order ID), `logs/equity.jsonl` (one equity mark per minute), `logs/bot.log`.
 
-The `Samyak` branch through `87ad83f` is incorporated. The [downloader guide](docs/BINANCE_DOWNLOADER.md) describes `binance_downloader.py`. Downloads are optional and access the public Binance archive; regression checks use local synthetic data instead.
+**Reproduce the research.**
 
 ```sh
-python binance_downloader.py --start 2026-07-01 --end 2026-08-31 --symbols BTCUSDT ETHUSDT SOLUSDT BNBUSDT XRPUSDT
-python scripts/backtest_sol.py --symbol SOLUSDT --bar 5m --horizon 12 --start 2026-07-01 --end 2026-09-01
-python scripts/sweep.py --symbols SOLUSDT ETHUSDT BTCUSDT --jobs 4
+python binance_downloader.py --symbols ENAUSDT FETUSDT WLDUSDT UNIUSDT TAOUSDT ONDOUSDT AAVEUSDT VIRTUALUSDT HBARUSDT ARBUSDT ICPUSDT FILUSDT SEIUSDT APTUSDT ASTERUSDT XLMUSDT PUMPUSDT --start 2026-04-01 --end 2026-10-04 --interval 1m
+python -m roostoo_bot.scripts.midcap_research --validate 8     # strategy grid, research and validation periods
+python -m roostoo_bot.scripts.shadow_replay                    # history replayed through the live engine vs the backtest
 ```
 
-The backtest loader labels candles by their closing availability time in UTC epoch milliseconds, drops incomplete boundary bars and rejects internal missing candles. Coarse bars update the research cadence and annualization settings. Train/validation sizes remain bar counts; short windows fail explicitly. Single-class or insufficient calibration folds are marked as skipped, remain flat and are counted in `n_skipped_folds`.
+## Competition rules and how the bot complies
 
-The sweep uses the current nine-stage comparison and actual fill counts. Failed cells make the sweep exit unsuccessfully, even if partial results are saved. `--maker` is rejected until a resting-order fill model exists. The inherited 0.0006 sizing reference is an experimental 1m setting, not a demonstrated parameter for other cadences.
+- **Autonomous:** all trades come from the bot's loop; changes go through commits, `git pull` and a service restart. No manual orders.
+- **Not high-frequency:** one rebalance per day, market orders only, 30 calls/minute budget enforced in code.
+- **Logging:** timestamp, symbol, side, price, quantity, fee and order ID are written for every fill, plus the equity after it.
+- **Open source:** this repository; each strategy change is a separate commit.
 
-[Earlier backtest findings](docs/BACKTEST_RESULTS.md) are preserved as historical research, not reproduced results for this combined engine. See [integration decisions](docs/INTEGRATION.md) for the differences, including the earlier horizon-hold experiment.
+## Documentation
 
-## Paper run
+- [ROADMAP.md](ROADMAP.md): plan, phases and decisions
+- [docs/MIDCAP_RESEARCH.md](docs/MIDCAP_RESEARCH.md): strategy research and results
+- [docs/LIVE_READINESS.md](docs/LIVE_READINESS.md): what was verified and what remains before live trading
+- [docs/ORGANIZER_QUESTIONS.md](docs/ORGANIZER_QUESTIONS.md): open questions and the assumptions used meanwhile
+- [docs/OFFLINE_VALIDATION.md](docs/OFFLINE_VALIDATION.md): the earlier model-based pipeline and its regression fixes
+- [docs/BINANCE_DOWNLOADER.md](docs/BINANCE_DOWNLOADER.md), [docs/BACKTEST_RESULTS.md](docs/BACKTEST_RESULTS.md), [docs/INTEGRATION.md](docs/INTEGRATION.md): downloader guide and earlier single-coin research by SamyakJain092006
 
-After historical model artifacts exist:
+## Team
 
-```sh
-python -m roostoo_bot.main --model-dir models
-```
-
-This polls the public ticker and ExchangeInfo, simulates bid/ask plus configured slippage/fees, and persists `data_store/paper_state.json` and `logs/events.jsonl`. It does not place exchange orders. Without any models, startup fails before accessing the API. Rule-only paper research requires explicitly disabling the estimated-return cost filter because no trained rule-payoff model exists.
-
-Keep paper and live state files separate. An uncertain-order marker is deliberately not auto-cleared: verify account/order state before resuming. Dust below venue minimums can remain, and an exhausted hourly order quota can defer liquidation. Drawdown halts prohibit new risk while exit orders wait for available quota/fresh quotes.
-
-## Remaining gates before live implementation
-
-1. Freeze a representative historical corpus, periods, parameters and final holdout. Run paired momentum/mean-reversion/cross-sectional baselines and parameter, asset, period, fee and latency stress tests.
-2. Verify current competition permissions, rate limits, spot fees, short fees and scoring conventions. The code uses research defaults. Official API reference: https://github.com/roostoo/Roostoo-API-Documents .
-3. Run a sustained paper/shadow comparison and reconcile signals, quantities, fills, fees and P&L against the actual simulator. Fixtures cannot establish real venue parity.
-4. Review any intended live enablement separately. Both live guards are still disabled. The live adapter reads wallet/pending/short state and stops on an unresolved response; its behavior has been exercised only with mocked API responses.
-
-The handbook recommends retaining a few validated strategy families. Missing breakout/volume strategies, portfolio concentration/daily loss policies, experiment statistics and a held-out market performance record remain research work; this repair does not turn those gaps into demonstrated coverage.
+Shreyan Thanki (ShockXR) and Samyak (SamyakJain092006). Built with assistance from Claude (Anthropic).
