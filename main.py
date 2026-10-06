@@ -249,6 +249,39 @@ def process_largecap_sleeve(raw_data: dict[str, pd.DataFrame]):
             log.info("📝 [LARGECAP DRY RUN] Simulated BUY for %s: $%.2f USD (%.4f coins @ $%.2f)", pair, target_usd_cost, coin_quantity, latest_price)
 
 
+COOLDOWN_FILE = os.path.join(getattr(config, "STORE_DIR", "data_store"), "cooldowns.json")
+
+
+def load_cooldowns() -> dict:
+    if os.path.exists(COOLDOWN_FILE):
+        try:
+            with open(COOLDOWN_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def record_cooldown(pair: str, hours: float = 2.0):
+    cooldowns = load_cooldowns()
+    cooldowns[pair] = time.time() + (hours * 3600)
+    try:
+        os.makedirs(os.path.dirname(COOLDOWN_FILE), exist_ok=True)
+        with open(COOLDOWN_FILE, "w") as f:
+            json.dump(cooldowns, f, indent=2)
+    except Exception as e:
+        log.error("Failed to save cooldown file: %s", e)
+
+
+def is_in_cooldown(pair: str) -> bool:
+    cooldowns = load_cooldowns()
+    expiry = cooldowns.get(pair, 0)
+    if time.time() < expiry:
+        rem_mins = int((expiry - time.time()) / 60)
+        return True, rem_mins
+    return False, 0
+
+
 def process_midcap_sleeve(raw_data: dict[str, pd.DataFrame]):
     """Processes Sleeve 2 (11 Mid-Cap Coins) using blend_v10 Dual Momentum + Profit-Gated Rank Rotation."""
     midcap_pairs = getattr(config, "MIDCAP_UNIVERSE", [])
@@ -277,13 +310,14 @@ def process_midcap_sleeve(raw_data: dict[str, pd.DataFrame]):
                 time_elapsed = time.time() - entry_time
                 is_in_top_rank = pair in top_leaders
 
-                # Rule 1: Mid-Cap Volatility Stop Loss (2.5 * Volatility)
+                # Rule 1: Mid-Cap Volatility Stop Loss (3.5 * Volatility)
                 if latest_price <= stop_price:
-                    log.warning("🚨 [MIDCAP RULE 1: STOP-LOSS] %s: Price $%.4f dropped below Stop-Loss $%.4f. Executing SELL.", pair, latest_price, stop_price)
+                    log.warning("🚨 [MIDCAP RULE 1: STOP-LOSS] %s: Price $%.4f dropped below Stop-Loss $%.4f (3.5x Vol). Executing SELL & setting 2h cool-down.", pair, latest_price, stop_price)
                     if not DRY_RUN and quantity > 0:
                         place_order(pair, "SELL", quantity=quantity)
                     del ACTIVE_POSITIONS[pair]
                     save_active_positions()
+                    record_cooldown(pair, hours=getattr(config, "POST_STOP_LOSS_COOLDOWN_HOURS", 2.0))
                     continue
 
                 # Rule 2: Mid-Cap Fee-Protected Take Profit
@@ -306,14 +340,18 @@ def process_midcap_sleeve(raw_data: dict[str, pd.DataFrame]):
                     save_active_positions()
                     continue
 
-                # Rule 4: 4-Hour Post 00:00 UTC Recovery Cutoff
-                expiry_secs = getattr(config, "MIDCAP_RANK_OUT_EXPIRY_HOURS", 4) * 3600
+                # Rule 4: Dynamic Post Rank-Out Recovery Cutoff (12h for slow coins, 4h for fast coins)
+                slow_coins = getattr(config, "SLOW_CONSOLIDATING_MIDCAPS", ["ONDO/USD", "CFX/USD", "POL/USD", "SEI/USD", "ARB/USD"])
+                expiry_hours = getattr(config, "SLOW_MIDCAP_EXPIRY_HOURS", 12) if pair in slow_coins else getattr(config, "FAST_MIDCAP_EXPIRY_HOURS", 4)
+                expiry_secs = expiry_hours * 3600
+
                 if not is_in_top_rank and time_elapsed >= expiry_secs:
-                    log.info("⏰ [MIDCAP RULE 4: 4-HOUR EXPIRY] %s: 4-hour recovery window expired. Executing SELL.", pair)
+                    log.info("⏰ [MIDCAP RULE 4: %dH EXPIRY] %s: %d-hour recovery window expired. Executing SELL & setting 2h cool-down.", expiry_hours, pair, expiry_hours)
                     if not DRY_RUN and quantity > 0:
                         place_order(pair, "SELL", quantity=quantity)
                     del ACTIVE_POSITIONS[pair]
                     save_active_positions()
+                    record_cooldown(pair, hours=getattr(config, "POST_STOP_LOSS_COOLDOWN_HOURS", 2.0))
                     continue
 
                 log.info("[MIDCAP] %s: Position active (In Top Rank: %s, Holding: %dm, Price: $%.4f, Stop: $%.4f, TP: $%.4f)", pair, is_in_top_rank, int(time_elapsed // 60), latest_price, stop_price, tp_price)
@@ -321,6 +359,12 @@ def process_midcap_sleeve(raw_data: dict[str, pd.DataFrame]):
 
         # Strategy Entry Signal: Only buy if pair is in top_leaders
         if pair not in top_leaders:
+            continue
+
+        # Check Post-Exit Cool-Down Lockout
+        in_cd, rem_m = is_in_cooldown(pair)
+        if in_cd:
+            log.info("⏳ [MIDCAP COOL-DOWN] %s is in 2-hour post-exit lockout (%d mins remaining). Skipping re-entry.", pair, rem_m)
             continue
 
         realized_vol = df[price_col].pct_change().rolling(30, min_periods=5).std().iloc[-1]

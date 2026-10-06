@@ -122,14 +122,21 @@ MIN_CONFIDENCE_TO_TRADE = 0.55     # model probability threshold
 
 # Sleeve 1 (Large-Caps) Parameters
 MAX_POSITION_PER_ASSET = 0.08    # 8% max per large-cap coin
-STOP_LOSS_K = 2.0                # Exit if price drops by > 2 * Volatility distance (Rule 1)
+STOP_LOSS_K = 3.0                # Exit if price drops by > 3.0 * Volatility distance (Rule 1, widened from 2.0)
 TAKE_PROFIT_K = 1.5              # Exit if price gains > 1.5 * Volatility distance (Rule 2)
 
 # Sleeve 2 (Mid-Caps) Parameters
 MIDCAP_MAX_POSITION_PER_ASSET = 0.05 # 5% max per mid-cap coin ($5,000 USD)
-MIDCAP_STOP_LOSS_K = 2.5             # Exit if mid-cap price drops by > 2.5 * Volatility (Rule 1)
+MIDCAP_STOP_LOSS_K = 3.5             # Exit if mid-cap price drops by > 3.5 * Volatility (Rule 1, widened from 3.0)
 MIDCAP_TAKE_PROFIT_K = 2.0           # Exit if mid-cap price gains > 2.0 * Volatility (Rule 2)
-MIDCAP_RANK_OUT_EXPIRY_HOURS = 4     # 4 Hours post 00:00 UTC rebalance recovery cutoff (Rule 4)
+
+# Slower Consolidating Mid-Caps (ONDO, CFX, POL, SEI, ARB) -> 12 Hours Recovery Window
+SLOW_CONSOLIDATING_MIDCAPS = [
+    "ONDO/USD", "CFX/USD", "POL/USD", "SEI/USD", "ARB/USD"
+]
+SLOW_MIDCAP_EXPIRY_HOURS = 12        # 12 Hours recovery window for slower consolidating mid-caps
+FAST_MIDCAP_EXPIRY_HOURS = 4         # 4 Hours recovery window for fast-recovering mid-caps
+POST_STOP_LOSS_COOLDOWN_HOURS = 2    # 2 Hours post-stop-loss cool-down lockout before re-entry
 SIZING_REFERENCE_VOL = 0.0006
 
 # --- Component switches (used by the ablation harness) ---
