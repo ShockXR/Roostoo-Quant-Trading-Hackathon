@@ -16,6 +16,12 @@ SYMBOLS = {
     "BNB/USD": "BNBUSDT",
     "XRP/USD": "XRPUSDT",
     "ADA/USD": "ADAUSDT",
+    "DOGE/USD": "DOGEUSDT",
+    "LINK/USD": "LINKUSDT",
+    "AVAX/USD": "AVAXUSDT",
+    "DOT/USD": "DOTUSDT",
+    "LTC/USD": "LTCUSDT",
+    "SUI/USD": "SUIUSDT",
 }
 
 

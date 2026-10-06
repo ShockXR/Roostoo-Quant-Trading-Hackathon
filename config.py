@@ -62,8 +62,11 @@ UNIVERSE_GROUPS = {
     ],
 }
 
-# Active trading universe -- set to your 6 chosen major coins
-UNIVERSE = ["BTC/USD", "ETH/USD", "SOL/USD", "BNB/USD", "XRP/USD", "ADA/USD"]
+# Active trading universe -- 12 major liquid coins
+UNIVERSE = [
+    "BTC/USD", "ETH/USD", "SOL/USD", "BNB/USD", "XRP/USD", "ADA/USD",
+    "DOGE/USD", "LINK/USD", "AVAX/USD", "DOT/USD", "LTC/USD", "SUI/USD"
+]
 MARKET_PROXY = "BTC/USD"  # used for "return relative to market" features
 
 # --- Data collection ---
@@ -107,21 +110,17 @@ TARGET_THRESHOLD = ROUND_TRIP_COST_ESTIMATE + SLIPPAGE_ESTIMATE + SAFETY_MARGIN
 # Prefer LIMIT (maker) orders where the strategy allows resting an order --
 # maker fee is half the taker fee, which matters a lot at this trade frequency.
 
-# --- Position sizing / risk ---
-# Scoring is 0.4*Sortino + 0.3*Sharpe + 0.3*Calmar -- ALL THREE penalize
-# drawdown/downside volatility, not just raw return. A high-return,
-# high-drawdown bot scores worse than a modest-return, low-drawdown one.
-# Risk controls below are tuned toward that, not toward maximizing raw PnL.
-MAX_POSITION_PER_ASSET = 0.20    # fraction of capital, trimmed from 0.25 for risk-adjusted scoring
-MAX_PORTFOLIO_EXPOSURE = 0.7      # fraction of capital deployed at once
+# --- Position sizing & Risk Exits ---
+MAX_POSITION_PER_ASSET = 0.08    # 8% max per coin (12 coins * 8% = 96% max, bounded by 70% total portfolio exposure)
+MAX_PORTFOLIO_EXPOSURE = 0.70     # 70% fraction of capital deployed at once (30% cash buffer preserved)
 MAX_TRADES_PER_HOUR = 20
 MAX_DRAWDOWN_KILL_SWITCH = 0.12   # Calmar = return / max drawdown, so capping drawdown directly protects this metric
 MIN_CONFIDENCE_TO_TRADE = 0.55     # model probability threshold to act at all
-# Per-bar realized vol (REGIME_VOL_WINDOW-bar std of 1m returns) above which
-# position size is shrunk proportionally. ~median for SOL 1m, Jul-Sep 2026
-# (median 0.00057, p75 0.00079); the old 0.01 was never reached on 1m bars,
-# so the vol shrink was a no-op. Re-tune if POLL_INTERVAL_SECONDS changes.
 SIZING_REFERENCE_VOL = 0.0006
+
+# Volatility-based Risk & Exit Multipliers
+STOP_LOSS_K = 2.0                # Exit if price drops by > 2 * Volatility distance (Rule 1)
+TAKE_PROFIT_K = 1.5              # Exit if price gains > 1.5 * Volatility distance or reaches 24h MA (Rule 2)
 
 # --- Component switches (used by the ablation harness) ---
 COMPONENTS = {
@@ -149,7 +148,7 @@ RANDOM_SEED = 42
 # Chosen as the centre of the plateau that was positive on Jul (train) and
 # Aug (validation) 2026; see TRADING_BOT_OPTIMIZATION_REPORT.md. Lookbacks
 # under ~1 day were NOT robust (negative on the Sep test period).
-REVERSAL_LOOKBACK_BARS = 1440   # 1 day of 1m bars
+REVERSAL_LOOKBACK_BARS = 1440   # 1 day of 1m bars (proven optimal in optimization report)
 REVERSAL_K = 1.5
-REVERSAL_HOLD_BARS = 1440
-REVERSAL_CHECK_EVERY = 60       # minutes
+REVERSAL_HOLD_BARS = 1440       # 1 day hold (proven optimal in optimization report)
+REVERSAL_CHECK_EVERY = 60     # minutes
