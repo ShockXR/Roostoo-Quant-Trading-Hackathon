@@ -151,4 +151,4 @@ RANDOM_SEED = 42
 REVERSAL_LOOKBACK_BARS = 1440   # 1 day of 1m bars (proven optimal in optimization report)
 REVERSAL_K = 1.5
 REVERSAL_HOLD_BARS = 1440       # 1 day hold (proven optimal in optimization report)
-REVERSAL_CHECK_EVERY = 60     # minutes
+REVERSAL_CHECK_EVERY = 1        # minute-by-minute dip signal evaluation
