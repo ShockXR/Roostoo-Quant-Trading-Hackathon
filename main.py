@@ -16,12 +16,12 @@ try:
     import config, costs, sizing, strategy
     from data.collector import poll_once
     from data.store import load_all
-    from execution.trader import place_order
+    from execution.trader import place_order, get_balance
 except ImportError:
     from . import config, costs, sizing, strategy
     from .data.collector import poll_once
     from .data.store import load_all
-    from .execution.trader import place_order
+    from .execution.trader import place_order, get_balance
 
 log = logging.getLogger("main")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -102,15 +102,37 @@ def run_once():
 
         log.info("%s: STRATEGY SIGNAL TRIGGERED (%s) size=%.4f (raw=%.4f, vol=%.6f)", pair, SELECTED_STRATEGY, final_size, raw_signal, realized_vol if (realized_vol is not None and not np.isnan(realized_vol)) else 0.0)
 
+        # Convert capital fraction into target USD cost
+        latest_price = df[price_col].iloc[-1]
+        account_equity = getattr(config, "INITIAL_CAPITAL", 100000.0)
+        target_usd_cost = account_equity * final_size
+
+        # Cash Balance Safeguard: Verify available free USD cash in wallet
+        try:
+            bal_resp = get_balance()
+            if isinstance(bal_resp, dict) and bal_resp.get("Success"):
+                free_usd = float(bal_resp.get("SpotWallet", {}).get("USD", {}).get("Free", account_equity))
+                if target_usd_cost > free_usd:
+                    log.warning("%s: Target cost $%.2f exceeds free USD $%.2f; trimming trade size", pair, target_usd_cost, free_usd)
+                    target_usd_cost = max(0.0, free_usd * 0.95)
+        except Exception:
+            pass
+
+        if target_usd_cost <= 0:
+            log.info("%s: insufficient USD cash to open trade, skipping", pair)
+            continue
+
+        coin_quantity = target_usd_cost / max(1e-6, latest_price)
+
         # Mark position active to block duplicate buys
         ACTIVE_POSITIONS[pair] = time.time()
 
         # Per-coin Live vs Paper-trade logic:
         if not DRY_RUN and (pair in LIVE_PAIRS or "ALL" in LIVE_PAIRS):
-            log.info("🚀 [LIVE ORDER] Executing REAL order on Roostoo for %s with size=%.4f", pair, final_size)
-            place_order(pair, "BUY", quantity=final_size)
+            log.info("🚀 [LIVE ORDER] Executing REAL order on Roostoo for %s: $%.2f USD (%.4f coins @ $%.2f)", pair, target_usd_cost, coin_quantity, latest_price)
+            place_order(pair, "BUY", quantity=coin_quantity)
         else:
-            log.info("📝 [PAPER TRADE / DRY RUN] Simulated BUY order for %s with size=%.4f", pair, final_size)
+            log.info("📝 [PAPER TRADE / DRY RUN] Simulated BUY order for %s: $%.2f USD (%.4f coins @ $%.2f)", pair, target_usd_cost, coin_quantity, latest_price)
 
 
 def run_forever(interval: int = config.POLL_INTERVAL_SECONDS):
