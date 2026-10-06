@@ -120,7 +120,33 @@ def place_order(pair: str, side: str, quantity: float, price: float | None = Non
         payload["price"] = str(price)
     resp = _request("POST", "/v3/place_order", payload, params=False)
     order_id = resp.get("order_id") if isinstance(resp, dict) else None
-    log_trade_to_csv(pair, side, quantity, execution_type="LIVE", price=price, order_id=order_id)
+
+    # Capture actual execution price for MARKET orders
+    exec_price = price
+    if exec_price is None and isinstance(resp, dict):
+        p_val = resp.get("price") or resp.get("avg_price") or resp.get("last_price") or resp.get("execution_price")
+        if p_val is not None:
+            try:
+                exec_price = float(p_val)
+            except (ValueError, TypeError):
+                pass
+
+    if exec_price is None:
+        try:
+            t_info = get_ticker(pair)
+            if isinstance(t_info, dict):
+                tlist = t_info.get("TickerList", {}) or t_info.get("tickerList", {})
+                if isinstance(tlist, dict):
+                    for k_p, pdata in tlist.items():
+                        if isinstance(pdata, dict):
+                            val = pdata.get("last_price") or pdata.get("LastPrice") or pdata.get("price") or pdata.get("Price") or 0.0
+                            if float(val) > 0:
+                                exec_price = float(val)
+                                break
+        except Exception:
+            pass
+
+    log_trade_to_csv(pair, side, quantity, execution_type="LIVE", price=exec_price, order_id=order_id)
     return resp
 
 

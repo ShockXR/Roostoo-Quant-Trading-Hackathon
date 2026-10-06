@@ -239,11 +239,17 @@ def analyze():
                     except (ValueError, TypeError):
                         price = 0.0
 
+                    if price <= 0.0:
+                        price = get_live_price(pair, prices)
+
                     if side == "BUY":
                         buy_stack.append((qty, price, ts))
                     elif side == "SELL" and buy_stack:
                         b_qty, b_price, b_ts = buy_stack.pop(0)
-                        if b_price > 0 and price > 0:
+                        if b_price <= 0.0:
+                            b_price = price
+
+                        if price > 0 and b_price > 0:
                             gross_val_entry = b_price * qty
                             gross_val_exit = price * qty
                             gross_pnl = gross_val_exit - gross_val_entry
