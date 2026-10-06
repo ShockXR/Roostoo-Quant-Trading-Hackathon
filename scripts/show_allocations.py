@@ -33,22 +33,25 @@ def main():
     wallet = resp.get("SpotWallet", {})
     free_usd = float(wallet.get("USD", {}).get("Free", 0.0))
 
-    # Fetch live ticker prices for evaluation (with local parquet fallback)
+    # Fetch live ticker prices for evaluation
     ticker_resp = get_ticker()
     prices = {}
     if ticker_resp and isinstance(ticker_resp, dict):
-        ticker_list = ticker_resp.get("TickerList", []) or ticker_resp.get("tickerList", [])
+        ticker_list = ticker_resp.get("TickerList", {}) or ticker_resp.get("tickerList", {})
         if isinstance(ticker_list, dict):
-            ticker_list = [ticker_list]
-        for item in ticker_list:
-            if isinstance(item, dict):
-                p = item.get("pair") or item.get("Pair") or item.get("symbol") or item.get("Symbol")
-                val = item.get("last_price") or item.get("LastPrice") or item.get("price") or item.get("Price") or 0.0
-                if p:
-                    try:
+            for p, pdata in ticker_list.items():
+                if isinstance(pdata, dict):
+                    val = pdata.get("last_price") or pdata.get("LastPrice") or pdata.get("price") or pdata.get("Price") or 0.0
+                    prices[p] = float(val)
+                elif isinstance(pdata, (int, float, str)):
+                    prices[p] = float(pdata)
+        elif isinstance(ticker_list, list):
+            for item in ticker_list:
+                if isinstance(item, dict):
+                    p = item.get("pair") or item.get("Pair") or item.get("symbol") or item.get("Symbol")
+                    val = item.get("last_price") or item.get("LastPrice") or item.get("price") or item.get("Price") or 0.0
+                    if p:
                         prices[p] = float(val)
-                    except (ValueError, TypeError):
-                        pass
 
     print(f"{'COIN':<8} | {'SLEEVE':<10} | {'EXACT QUANTITY':<18} | {'LIVE PRICE':<12} | {'USD VALUE':<14}")
     print("---------------------------------------------------------------------------------------")
