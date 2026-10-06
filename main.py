@@ -86,9 +86,13 @@ def run_once():
                 del ACTIVE_POSITIONS[pair]
                 continue
 
-            # Rule 2: Take-Profit / Mean-Reversion Target Exit
-            elif latest_price >= tp_price or latest_price >= ma_24h:
-                log.info("🎯 [RULE 2: TAKE-PROFIT TRIGGERED] %s: Price $%.4f reached Take-Profit target $%.4f / 24h MA $%.4f. Executing SELL.", pair, latest_price, tp_price, ma_24h)
+            # Rule 2: Take-Profit Target Exit (Guarantees fee coverage: +0.30% minimum or full TP target)
+            entry_price = pos.get("entry_price", latest_price)
+            min_fee_tp = entry_price * 1.003  # +0.30% minimum gain to clear 0.20% fees
+            target_sell_price = max(tp_price, min_fee_tp)
+
+            if latest_price >= target_sell_price:
+                log.info("🎯 [RULE 2: TAKE-PROFIT TRIGGERED] %s: Price $%.4f reached Take-Profit target $%.4f (Entry: $%.4f). Executing SELL.", pair, latest_price, target_sell_price, entry_price)
                 if not DRY_RUN and quantity > 0:
                     place_order(pair, "SELL", quantity=quantity)
                 del ACTIVE_POSITIONS[pair]
