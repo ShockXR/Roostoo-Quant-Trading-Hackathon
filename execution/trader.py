@@ -94,11 +94,22 @@ def log_trade_to_csv(pair: str, side: str, quantity: float, execution_type: str 
         ])
 
 
+def format_quantity(pair: str, qty: float) -> str:
+    """Formats quantity to conform to exchange step-size precision rules."""
+    if "BTC" in pair:
+        return f"{qty:.4f}"
+    elif "ETH" in pair:
+        return f"{qty:.3f}"
+    else:
+        return f"{qty:.2f}"  # BNB, SOL, XRP, ADA
+
+
 def place_order(pair: str, side: str, quantity: float, price: float | None = None):
+    formatted_qty = format_quantity(pair, quantity)
     payload = {
         "pair": pair,
         "side": side.upper(),
-        "quantity": str(quantity),
+        "quantity": formatted_qty,
         "type": "LIMIT" if price is not None else "MARKET",
     }
     if price is not None:
