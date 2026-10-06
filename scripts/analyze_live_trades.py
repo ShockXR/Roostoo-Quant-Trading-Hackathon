@@ -146,9 +146,17 @@ def analyze():
         if isinstance(tlist, dict):
             for p, pdata in tlist.items():
                 if isinstance(pdata, dict):
-                    prices[p] = float(pdata.get("last_price") or pdata.get("LastPrice") or 0.0)
+                    val = pdata.get("last_price") or pdata.get("LastPrice") or pdata.get("price") or pdata.get("Price") or 0.0
+                    prices[p] = float(val)
                 elif isinstance(pdata, (int, float, str)):
                     prices[p] = float(pdata)
+        elif isinstance(tlist, list):
+            for item in tlist:
+                if isinstance(item, dict):
+                    p = item.get("pair") or item.get("Pair") or item.get("symbol") or item.get("Symbol")
+                    val = item.get("last_price") or item.get("LastPrice") or item.get("price") or item.get("Price") or 0.0
+                    if p:
+                        prices[p] = float(val)
 
     if resp and isinstance(resp, dict) and resp.get("Success"):
         wallet = resp.get("SpotWallet", {})
@@ -158,11 +166,52 @@ def analyze():
         for coin, info in wallet.items():
             if coin == "USD":
                 continue
-            qty = float(info.get("Free", 0.0)) + float(info.get("Frozen", 0.0))
+            free_q = float(info.get("Free", 0.0))
+            froz_q = float(info.get("Frozen", 0.0))
+            qty = free_q + froz_q
             if qty <= 0:
                 continue
             pair = f"{coin}/USD"
             p = prices.get(pair, 0.0)
+
+            # 3-Tier Price Lookup Fallback
+            if p == 0.0:
+                try:
+                    s_tick = get_ticker(pair)
+                    if s_tick and isinstance(s_tick, dict):
+                        st_list = s_tick.get("TickerList", {})
+                        if isinstance(st_list, dict):
+                            for k_p, pdata in st_list.items():
+                                if isinstance(pdata, dict):
+                                    val = pdata.get("last_price") or pdata.get("LastPrice") or pdata.get("price") or 0.0
+                                    if float(val) > 0:
+                                        p = float(val)
+                                        break
+                except Exception:
+                    pass
+
+            if p == 0.0:
+                safe = pair.replace("/", "_")
+                p_file = os.path.join(getattr(config, "STORE_DIR", "data_store"), f"{safe}.parquet")
+                if os.path.exists(p_file):
+                    try:
+                        df_p = pd.read_parquet(p_file)
+                        if not df_p.empty:
+                            col = "last_price" if "last_price" in df_p.columns else df_p.columns[-1]
+                            p = float(df_p[col].iloc[-1])
+                    except Exception:
+                        pass
+
+            if p == 0.0:
+                try:
+                    import requests
+                    binance_sym = f"{coin}USDT"
+                    b_resp = requests.get(f"https://api.binance.com/api/v3/ticker/price?symbol={binance_sym}", timeout=5)
+                    if b_resp.status_code == 200:
+                        p = float(b_resp.json().get("price", 0.0))
+                except Exception:
+                    pass
+
             val = qty * p
             crypto_val += val
 
