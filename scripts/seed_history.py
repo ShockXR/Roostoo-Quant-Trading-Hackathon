@@ -19,13 +19,24 @@ SYMBOLS = {
 }
 
 
-def fetch_binance_history(symbol: str, limit: int = 1000) -> pd.DataFrame:
-    url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=1m&limit={limit}"
-    resp = requests.get(url, timeout=10)
-    resp.raise_for_status()
-    data = resp.json()
+def fetch_binance_history(symbol: str, target_bars: int = 1500) -> pd.DataFrame:
+    """Fetches 1500+ candles (25+ hours) of Binance 1m price data using paginated REST requests."""
+    url = "https://api.binance.com/api/v3/klines"
+    
+    # 1. Fetch latest 1000 candles
+    resp1 = requests.get(f"{url}?symbol={symbol}&interval=1m&limit=1000", timeout=10)
+    resp1.raise_for_status()
+    data1 = resp1.json()
+    
+    # 2. Fetch preceding 500 candles before data1[0] timestamp
+    earliest_ts = data1[0][0]
+    resp2 = requests.get(f"{url}?symbol={symbol}&interval=1m&limit=600&endTime={earliest_ts - 1}", timeout=10)
+    resp2.raise_for_status()
+    data2 = resp2.json()
+    
+    combined = data2 + data1
     rows = []
-    for item in data:
+    for item in combined:
         rows.append({
             "timestamp": int(item[0]),
             "last_price": float(item[4]),  # Close price as last_price
