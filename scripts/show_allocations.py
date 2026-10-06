@@ -73,7 +73,23 @@ def main():
 
         live_price = prices.get(pair, 0.0)
 
-        # Fallback to data_store/*.parquet if ticker price is 0
+        # 1. Try per-pair Roostoo ticker query
+        if live_price == 0.0:
+            try:
+                single_tick = get_ticker(pair)
+                if single_tick and isinstance(single_tick, dict):
+                    tlist = single_tick.get("TickerList", {})
+                    if isinstance(tlist, dict):
+                        for k_p, pdata in tlist.items():
+                            if isinstance(pdata, dict):
+                                val = pdata.get("last_price") or pdata.get("LastPrice") or pdata.get("price") or 0.0
+                                if float(val) > 0:
+                                    live_price = float(val)
+                                    break
+            except Exception:
+                pass
+
+        # 2. Try local parquet historical data_store file
         if live_price == 0.0:
             safe = pair.replace("/", "_")
             p_file = os.path.join(getattr(config, "STORE_DIR", "data_store"), f"{safe}.parquet")
@@ -81,10 +97,22 @@ def main():
                 try:
                     df_p = pd.read_parquet(p_file)
                     if not df_p.empty:
-                        col = "close" if "close" in df_p.columns else "last_price"
+                        col = "last_price" if "last_price" in df_p.columns else df_p.columns[-1]
                         live_price = float(df_p[col].iloc[-1])
                 except Exception:
                     pass
+
+        # 3. Try Binance live REST API ticker fallback
+        if live_price == 0.0:
+            try:
+                import requests
+                binance_sym = f"{coin}USDT"
+                b_resp = requests.get(f"https://api.binance.com/api/v3/ticker/price?symbol={binance_sym}", timeout=5)
+                if b_resp.status_code == 200:
+                    live_price = float(b_resp.json().get("price", 0.0))
+            except Exception:
+                pass
+
         usd_val = total_qty * live_price
         total_coins_usd += usd_val
 
