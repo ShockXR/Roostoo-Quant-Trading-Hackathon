@@ -239,7 +239,8 @@ def main():
     metrics.to_csv(out / "metrics.csv", index=False)
     for period, tr in trades.items():
         tr.to_csv(out / f"trades_{period}.csv", index=False)
-    eq = pd.DataFrame(curves)
+    # daily marks (last hourly close of each UTC day) keep the files small
+    eq = pd.DataFrame({k: v.resample("1D").last() for k, v in curves.items()})
     eq.to_csv(out / "equity.csv")
     if "full" in curves:
         monthly_returns(curves["full"]).rename("return").to_csv(out / "monthly_full.csv")
