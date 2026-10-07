@@ -65,12 +65,33 @@ def save_active_positions():
         log.error("Failed to save active positions file: %s", e)
 
 
+def get_true_entry_price(pair: str, fallback_price: float) -> float:
+    """Reads data_store/trades_log.csv to retrieve the true historical purchase fill price."""
+    trades_file = os.path.join(getattr(config, "STORE_DIR", "data_store"), "trades_log.csv")
+    if os.path.exists(trades_file):
+        try:
+            df = pd.read_csv(trades_file)
+            buy_df = df[(df["pair"] == pair) & (df["side"].str.upper() == "BUY")]
+            if not buy_df.empty:
+                prices_series = buy_df["price"]
+                for p_val in reversed(prices_series.tolist()):
+                    try:
+                        p_float = float(p_val)
+                        if p_float > 0:
+                            log.info("🎯 [TRUE ENTRY PRICE RESOLVED] %s: Found true historical purchase price $%.4f from trades_log.csv", pair, p_float)
+                            return p_float
+                    except (ValueError, TypeError):
+                        continue
+        except Exception as e:
+            log.error("Failed to read true entry price for %s: %s", pair, e)
+    return fallback_price
+
+
 def adopt_wallet_holdings(raw_data: dict[str, pd.DataFrame]):
     """
     Queries live Roostoo wallet balance (/v3/balance) and automatically adopts any existing 
     wallet coin holdings (e.g. BNB, POL, ONDO, SEI, CFX) into ACTIVE_POSITIONS tracking.
-    This ensures NO forced selling at a loss; the bot will manage all current holdings 
-    using Rule 1 Volatility Stop-Loss and Rule 2 Take-Profit rules.
+    Uses get_true_entry_price() to preserve true historical cost basis across bot restarts.
     """
     try:
         resp = get_balance()
@@ -103,13 +124,14 @@ def adopt_wallet_holdings(raw_data: dict[str, pd.DataFrame]):
                 sl_k = getattr(config, "STOP_LOSS_K", 3.0) if sleeve == "largecap" else getattr(config, "MIDCAP_STOP_LOSS_K", 3.5)
                 tp_k = getattr(config, "TAKE_PROFIT_K", 1.5) if sleeve == "largecap" else getattr(config, "MIDCAP_TAKE_PROFIT_K", 2.0)
 
+                true_entry_p = get_true_entry_price(pair, fallback_price=latest_p)
                 vol_dist = latest_p * vol_24h * np.sqrt(1440)
-                stop_p = latest_p - (sl_k * vol_dist)
-                tp_p = latest_p + (tp_k * vol_dist)
+                stop_p = true_entry_p - (sl_k * vol_dist)
+                tp_p = true_entry_p + (tp_k * vol_dist)
 
                 ACTIVE_POSITIONS[pair] = {
                     "entry_time": time.time(),
-                    "entry_price": latest_p,
+                    "entry_price": true_entry_p,
                     "stop_price": stop_p,
                     "take_profit_price": tp_p,
                     "quantity": total_qty,
@@ -117,7 +139,7 @@ def adopt_wallet_holdings(raw_data: dict[str, pd.DataFrame]):
                     "is_adopted": True,
                 }
                 adopted_count += 1
-                log.info("🛡️ [ADOPTED HOLDING] Adopted live wallet holding for %s: %.4f coins @ $%.4f (Stop: $%.4f, TP: $%.4f)", pair, total_qty, latest_p, stop_p, tp_p)
+                log.info("🛡️ [ADOPTED HOLDING] Adopted live wallet holding for %s: %.4f coins @ True Entry $%.4f (Stop: $%.4f, TP: $%.4f)", pair, total_qty, true_entry_p, stop_p, tp_p)
 
         if adopted_count > 0:
             save_active_positions()
