@@ -31,8 +31,8 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from common import (EXPERIMENTS_DIR, HOURLY_CACHE_DIR, LONG_DATA_DIR, LONG_PERIODS,  # noqa: E402
-                    LONG_UNIVERSES, load_ohlcv, period_slice, register_package)
+from common import (DELISTED, EXPERIMENTS_DIR, HOURLY_CACHE_DIR, LONG_DATA_DIR,  # noqa: E402
+                    LONG_PERIODS, LONG_UNIVERSES, load_ohlcv, period_slice, register_package)
 
 LONG_DIR = EXPERIMENTS_DIR / "long"
 START, END = pd.Timestamp(LONG_PERIODS["full"][0], tz="UTC"), pd.Timestamp(LONG_PERIODS["full"][1], tz="UTC")
@@ -49,13 +49,21 @@ def _parse_params(items: list[str]) -> dict:
     return out
 
 
+def load_long_1m(symbol: str) -> pd.DataFrame:
+    """Long 1m history, cut at the delisting time for delisted assets."""
+    m1 = load_ohlcv(symbol, LONG_DATA_DIR)
+    if symbol in DELISTED:
+        m1 = m1[m1.index < pd.Timestamp(DELISTED[symbol], tz="UTC")]
+    return m1
+
+
 def load_hourly(symbol: str) -> pd.DataFrame:
     """Hourly bars from the long 1m history, cached (gitignored)."""
     from roostoo.strategies.features import fill_minute_grid, hourly_bars
     cache = HOURLY_CACHE_DIR / f"{symbol}_1h.parquet"
     if cache.exists():
         return pd.read_parquet(cache)
-    m1, filled = fill_minute_grid(load_ohlcv(symbol, LONG_DATA_DIR))
+    m1, filled = fill_minute_grid(load_long_1m(symbol))
     bars = hourly_bars(m1)
     HOURLY_CACHE_DIR.mkdir(parents=True, exist_ok=True)
     bars.to_parquet(cache)
@@ -92,7 +100,7 @@ def minute_closes(universe: str) -> pd.DataFrame:
     if cache.exists():
         return pd.read_parquet(cache)
     idx = pd.date_range(START, END, freq="1min", inclusive="left")
-    cols = {s: fill_minute_grid(load_ohlcv(s, LONG_DATA_DIR))[0]["close"].reindex(idx).ffill().bfill()
+    cols = {s: fill_minute_grid(load_long_1m(s))[0]["close"].reindex(idx).ffill().bfill()
             .astype("float32") for s in LONG_UNIVERSES[universe]}
     out = pd.DataFrame(cols)
     out.to_parquet(cache)

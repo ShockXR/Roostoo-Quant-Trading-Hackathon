@@ -29,6 +29,10 @@ HOURLY_CACHE_DIR = ROOT / "binance_data" / "long" / "hourly"
 LARGE_CAPS_2022 = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "ADAUSDT",
                    "XRPUSDT", "LUNAUSDT", "DOTUSDT", "AVAXUSDT", "DOGEUSDT"]
 LONG_UNIVERSES = {"large_caps_2022": LARGE_CAPS_2022}
+# Last real bar (exclusive end) of assets that left Binance during the sample.
+# LUNAUSDT stopped trading 2022-05-13 00:39 UTC; the ticker reappears on
+# 2022-05-31 as a different token (LUNA 2.0), which must not be spliced on.
+DELISTED = {"LUNAUSDT": "2022-05-13 00:40"}
 
 # Chronological split for the long history, fixed before any model was run
 # on it. Parameters are chosen on TRAIN (2022 bear + 2023 recovery), checked

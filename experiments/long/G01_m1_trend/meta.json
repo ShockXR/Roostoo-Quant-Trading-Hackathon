@@ -1,0 +1,25 @@
+{
+  "id": "G01_m1_trend",
+  "model": "m1_reversal_trend",
+  "universe": "large_caps_2022",
+  "grid": {
+    "trend_days": [
+      20,
+      50,
+      100,
+      200
+    ],
+    "k": [
+      1.5,
+      2.0
+    ]
+  },
+  "fixed": {},
+  "periods": [
+    "train",
+    "validation"
+  ],
+  "fee_per_side": 0.001,
+  "slippage_per_side": 0.00015,
+  "kind": "sweep"
+}

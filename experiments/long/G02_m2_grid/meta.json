@@ -1,0 +1,28 @@
+{
+  "id": "G02_m2_grid",
+  "model": "m2_xs_momentum",
+  "universe": "large_caps_2022",
+  "grid": {
+    "lookback_days": [
+      7,
+      14,
+      28,
+      56,
+      90
+    ],
+    "top_n": [
+      2,
+      3,
+      4,
+      5
+    ]
+  },
+  "fixed": {},
+  "periods": [
+    "train",
+    "validation"
+  ],
+  "fee_per_side": 0.001,
+  "slippage_per_side": 0.00015,
+  "kind": "sweep"
+}

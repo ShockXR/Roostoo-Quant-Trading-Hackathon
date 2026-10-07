@@ -1,0 +1,27 @@
+{
+  "id": "G00_m0_family",
+  "model": "m0_reversal",
+  "universe": "large_caps_2022",
+  "grid": {
+    "lookback": [
+      12,
+      24,
+      36,
+      48
+    ],
+    "k": [
+      1.5,
+      2.0,
+      2.5,
+      3.0
+    ]
+  },
+  "fixed": {},
+  "periods": [
+    "train",
+    "validation"
+  ],
+  "fee_per_side": 0.001,
+  "slippage_per_side": 0.00015,
+  "kind": "sweep"
+}
