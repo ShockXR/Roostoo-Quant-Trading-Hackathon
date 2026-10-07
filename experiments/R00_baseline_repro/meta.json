@@ -1,0 +1,24 @@
+{
+  "id": "R00_baseline_repro",
+  "universe": "large_caps",
+  "strategy": "reversal",
+  "params": {},
+  "periods": [
+    "train",
+    "validation",
+    "test",
+    "full"
+  ],
+  "fee_per_side": 0.001,
+  "slippage_per_side": 0.00015,
+  "initial_capital": 100000.0,
+  "execution_delay_bars": 0,
+  "max_position_per_asset": 0.2,
+  "max_portfolio_exposure": 0.7,
+  "target_horizon": 10,
+  "targets_from": null,
+  "run_at": "2026-10-07T19:31:29",
+  "runtime_s": 12.6,
+  "git_commit": "922dd8c",
+  "note": "Model 0 baseline reproduction on model-research branch"
+}

@@ -28,6 +28,8 @@ BENCHMARKS = {"large_caps": "B00_buy_hold_20pct", "mid_caps": "midcaps/MB00_buy_
 def main():
     rows = []
     for meta_path in sorted(EXPERIMENTS_DIR.rglob("meta.json")):
+        if "long" in meta_path.relative_to(EXPERIMENTS_DIR).parts:
+            continue  # hourly long-history runs: scripts/summarize_long.py
         meta = json.loads(meta_path.read_text())
         m = pd.read_csv(meta_path.parent / "metrics.csv")
         for period, g in m.groupby("period", sort=False):

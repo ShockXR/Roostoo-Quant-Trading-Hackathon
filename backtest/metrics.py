@@ -51,18 +51,24 @@ def _drawdown_episodes(dd: pd.Series) -> list[float]:
     return depths
 
 
-def equity_stats(equity: pd.Series, initial_capital: float) -> dict:
-    eq = pd.concat([pd.Series([initial_capital], index=[equity.index[0] - pd.Timedelta("1min")]), equity])
+def equity_stats(equity: pd.Series, initial_capital: float, bar_minutes: int = 1) -> dict:
+    """bar_minutes: spacing of the equity marks. Bar-level Sharpe/Sortino are
+    keyed *_1m for 1-minute bars (the competition convention) and *_bar
+    otherwise, so hourly research runs never report a mislabelled figure."""
+    bar = pd.Timedelta(minutes=bar_minutes)
+    bars_per_year = MINUTES_PER_YEAR / bar_minutes
+    eq = pd.concat([pd.Series([initial_capital], index=[equity.index[0] - bar]), equity])
     r1m = eq.pct_change().dropna()
     daily = eq.resample("1D").last().dropna()
     daily = pd.concat([pd.Series([initial_capital], index=[daily.index[0] - pd.Timedelta("1D")]), daily])
     rd = daily.pct_change().dropna()
     dd = eq / eq.cummax() - 1
     episodes = _drawdown_episodes(dd)
-    years = len(r1m) / MINUTES_PER_YEAR
+    years = len(r1m) / bars_per_year
     total = float(eq.iloc[-1] / initial_capital - 1)
     ann = float((1 + total) ** (1 / years) - 1) if years > 0 and total > -1 else float("nan")
     max_dd = float(dd.min())
+    suffix = "1m" if bar_minutes == 1 else "bar"
     return {
         "initial_capital": initial_capital,
         "final_capital": float(eq.iloc[-1]),
@@ -74,8 +80,9 @@ def equity_stats(equity: pd.Series, initial_capital: float) -> dict:
         "time_underwater": float((dd < 0).mean()),
         "sharpe_daily": _sharpe(rd, 365),
         "sortino_daily": _sortino(rd, 365),
-        "sharpe_1m": _sharpe(r1m, MINUTES_PER_YEAR),
-        "sortino_1m": _sortino(r1m, MINUTES_PER_YEAR),
+        "volatility_annual": float(rd.std() * np.sqrt(365)),
+        f"sharpe_{suffix}": _sharpe(r1m, bars_per_year),
+        f"sortino_{suffix}": _sortino(r1m, bars_per_year),
         "calmar": float(ann / abs(max_dd)) if max_dd < 0 else 0.0,
         "worst_day": float(rd.min()),
         "best_day": float(rd.max()),
@@ -83,7 +90,7 @@ def equity_stats(equity: pd.Series, initial_capital: float) -> dict:
     }
 
 
-def trade_stats(trades: pd.DataFrame) -> dict:
+def trade_stats(trades: pd.DataFrame, bar_minutes: int = 1) -> dict:
     if trades.empty:
         return {"n_trades": 0, "winning_trades": 0, "losing_trades": 0, "win_rate": float("nan"),
                 "avg_win": float("nan"), "avg_loss": float("nan"), "profit_factor": float("nan"),
@@ -106,7 +113,7 @@ def trade_stats(trades: pd.DataFrame) -> dict:
         "expectancy_pct": float(trades["return_on_equity"].mean()),
         "largest_win": float(pnl.max()),
         "largest_loss": float(pnl.min()),
-        "avg_trade_minutes": float(trades["bars"].mean()),
+        "avg_trade_minutes": float(trades["bars"].mean() * bar_minutes),
         "max_consecutive_wins": _max_streak(pnl > 0),
         "max_consecutive_losses": _max_streak(pnl <= 0),
     }
@@ -133,10 +140,10 @@ def alpha_beta(equity: pd.Series, initial_capital: float, benchmark: pd.Series) 
     }
 
 
-def report(res: SimResult, benchmark: pd.Series | None = None) -> dict:
+def report(res: SimResult, benchmark: pd.Series | None = None, bar_minutes: int = 1) -> dict:
     """benchmark: buy & hold price (or basket value) series over the same bars."""
-    eq = equity_stats(res.equity, res.initial_capital)
-    tr = trade_stats(res.trades)
+    eq = equity_stats(res.equity, res.initial_capital, bar_minutes)
+    tr = trade_stats(res.trades, bar_minutes)
     gross_w = res.weights.abs().sum(axis=1)
     out = {**eq, **tr}
     if benchmark is not None:
