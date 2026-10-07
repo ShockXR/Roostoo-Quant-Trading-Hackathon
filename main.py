@@ -114,6 +114,7 @@ def adopt_wallet_holdings(raw_data: dict[str, pd.DataFrame]):
                     "take_profit_price": tp_p,
                     "quantity": total_qty,
                     "sleeve": sleeve,
+                    "is_adopted": True,
                 }
                 adopted_count += 1
                 log.info("🛡️ [ADOPTED HOLDING] Adopted live wallet holding for %s: %.4f coins @ $%.4f (Stop: $%.4f, TP: $%.4f)", pair, total_qty, latest_p, stop_p, tp_p)
@@ -197,15 +198,6 @@ def process_largecap_sleeve(raw_data: dict[str, pd.DataFrame]):
 
             if latest_price >= target_sell_price:
                 log.info("🎯 [LARGECAP RULE 2: TAKE-PROFIT] %s: Price $%.4f reached Take-Profit target $%.4f (Entry: $%.4f). Executing SELL.", pair, latest_price, target_sell_price, entry_price)
-                if not DRY_RUN and quantity > 0:
-                    place_order(pair, "SELL", quantity=quantity)
-                del ACTIVE_POSITIONS[pair]
-                save_active_positions()
-                continue
-
-            # Rule 3: Time Expiry
-            elif time_elapsed >= hold_secs:
-                log.info("⏰ [LARGECAP RULE 3: 24H HOLD COMPLETED] %s: Holding limit reached. Executing SELL.", pair)
                 if not DRY_RUN and quantity > 0:
                     place_order(pair, "SELL", quantity=quantity)
                 del ACTIVE_POSITIONS[pair]
@@ -415,20 +407,6 @@ def process_midcap_sleeve(raw_data: dict[str, pd.DataFrame]):
                         place_order(pair, "SELL", quantity=quantity)
                     del ACTIVE_POSITIONS[pair]
                     save_active_positions()
-                    continue
-
-                # Rule 4: Dynamic Post Rank-Out Recovery Cutoff (12h for slow coins, 4h for fast coins)
-                slow_coins = getattr(config, "SLOW_CONSOLIDATING_MIDCAPS", ["ONDO/USD", "CFX/USD", "POL/USD", "SEI/USD", "ARB/USD"])
-                expiry_hours = getattr(config, "SLOW_MIDCAP_EXPIRY_HOURS", 12) if pair in slow_coins else getattr(config, "FAST_MIDCAP_EXPIRY_HOURS", 4)
-                expiry_secs = expiry_hours * 3600
-
-                if not is_in_top_rank and time_elapsed >= expiry_secs:
-                    log.info("⏰ [MIDCAP RULE 4: %dH EXPIRY] %s: %d-hour recovery window expired. Executing SELL & setting 2h cool-down.", expiry_hours, pair, expiry_hours)
-                    if not DRY_RUN and quantity > 0:
-                        place_order(pair, "SELL", quantity=quantity)
-                    del ACTIVE_POSITIONS[pair]
-                    save_active_positions()
-                    record_cooldown(pair, hours=getattr(config, "POST_STOP_LOSS_COOLDOWN_HOURS", 2.0))
                     continue
 
                 log.info("[MIDCAP] %s: Position active (In Top Rank: %s, Holding: %dm, Price: $%.4f, Stop: $%.4f, TP: $%.4f)", pair, is_in_top_rank, int(time_elapsed // 60), latest_price, stop_price, tp_price)
