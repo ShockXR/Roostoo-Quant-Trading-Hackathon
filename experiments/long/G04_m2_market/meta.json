@@ -1,0 +1,28 @@
+{
+  "id": "G04_m2_market",
+  "model": "m2_xs_momentum",
+  "universe": "large_caps_2022",
+  "grid": {
+    "market_sma_days": [
+      null,
+      20,
+      50,
+      100,
+      150,
+      200
+    ],
+    "lookback_days": [
+      14,
+      28,
+      56
+    ]
+  },
+  "fixed": {},
+  "periods": [
+    "train",
+    "validation"
+  ],
+  "fee_per_side": 0.001,
+  "slippage_per_side": 0.00015,
+  "kind": "sweep"
+}

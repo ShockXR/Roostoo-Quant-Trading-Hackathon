@@ -16,6 +16,10 @@ Once a day, at the close of the 23:00 UTC bar:
      vol_target / the asset's 30-day annualized vol, in 2.5% steps so small
      vol changes do not trade);
   4. hold until the next daily decision.
+
+Optional market filter (`market_sma_days`): hold nothing unless the market
+proxy (`market_symbol`, BTC) closes above its `market_sma_days`-day simple
+moving average at the decision.
 """
 import numpy as np
 import pandas as pd
@@ -23,11 +27,16 @@ import pandas as pd
 from .. import config
 from .features import annualized_vol, panel
 
-DEFAULTS = {"lookback_days": 28, "top_n": 3, "vol_target": None, "decision_hour": 23}
+DEFAULTS = {"lookback_days": 28, "top_n": 3, "vol_target": None, "decision_hour": 23,
+            "market_sma_days": None, "market_symbol": "BTCUSDT"}
 
 
 def targets(bars: dict[str, pd.DataFrame], params: dict) -> pd.DataFrame:
+    """`lookback_days` may be a list: the average of one portfolio per lookback."""
     p = {**DEFAULTS, **params}
+    if isinstance(p["lookback_days"], list):
+        parts = [targets(bars, {**p, "lookback_days": lb}) for lb in p["lookback_days"]]
+        return sum(parts) / len(parts)
     lookback, top_n = int(p["lookback_days"]), int(p["top_n"])
     weight = float(p.get("weight", config.MAX_POSITION_PER_ASSET))
     close = panel(bars, "close")
@@ -41,5 +50,9 @@ def targets(bars: dict[str, pd.DataFrame], params: dict) -> pd.DataFrame:
         vol = annualized_vol(close, 30)[decide]
         scale = (float(p["vol_target"]) / vol).clip(upper=1.0)
         w = (w * scale.fillna(0.0) / 0.025).round() * 0.025
+    if p["market_sma_days"]:
+        mkt = close[p["market_symbol"]]
+        risk_on = (mkt > mkt.rolling(int(p["market_sma_days"]) * 24).mean())[decide]
+        w = w.mul(risk_on.astype(float), axis=0)
     out = w.reindex(close.index).ffill().fillna(0.0)
     return out.where(np.isfinite(out), 0.0)

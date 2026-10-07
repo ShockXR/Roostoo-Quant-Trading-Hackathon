@@ -1,0 +1,24 @@
+{
+  "id": "R03/cost_slip05",
+  "universe": "large_caps_2022",
+  "model": "m3_momentum_regime",
+  "params": {},
+  "periods": [
+    "train",
+    "validation",
+    "test",
+    "full"
+  ],
+  "fee_per_side": 0.001,
+  "slippage_per_side": 0.0005,
+  "execution_delay_hours": 0,
+  "exclude": [],
+  "targets_from": "L03_m3",
+  "max_position_per_asset": 0.2,
+  "max_portfolio_exposure": 0.7,
+  "bar": "1h",
+  "run_at": "2026-10-07T20:18:32",
+  "runtime_s": 4.8,
+  "git_commit": "ad95143",
+  "note": ""
+}

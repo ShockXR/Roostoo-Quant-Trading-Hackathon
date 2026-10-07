@@ -1,0 +1,30 @@
+{
+  "id": "W01_m3",
+  "model": "m2_xs_momentum",
+  "grid": {
+    "lookback_days": [
+      14,
+      21,
+      28,
+      42,
+      56
+    ],
+    "market_sma_days": [
+      50,
+      75,
+      100,
+      150,
+      200
+    ]
+  },
+  "fixed": {
+    "top_n": 3
+  },
+  "frozen": {
+    "lookback_days": 28,
+    "market_sma_days": 100
+  },
+  "start": "2023-01-01",
+  "end": "2026-07-01",
+  "kind": "walkforward"
+}

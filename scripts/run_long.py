@@ -74,13 +74,15 @@ def load_hourly(symbol: str) -> pd.DataFrame:
     return bars
 
 
-def load_universe(universe: str) -> tuple[dict, pd.DataFrame]:
+def load_universe(universe: str, exclude: list[str] | None = None) -> tuple[dict, pd.DataFrame]:
     """bars on one hourly index over the full window, plus a tradable mask.
     Outside an asset's own history its prices are held flat (ffill/bfill) and
     it is not tradable."""
     idx = pd.date_range(START, END, freq="1h", inclusive="left")
     bars, tradable = {}, {}
     for s in LONG_UNIVERSES[universe]:
+        if s in (exclude or []):
+            continue
         b = load_hourly(s)
         live = pd.Series((idx >= b.index[0]) & (idx <= b.index[-1]), index=idx)
         b = b.reindex(idx)
@@ -206,6 +208,7 @@ def main():
     ap.add_argument("--targets-from", help="experiment id whose cached targets to reuse")
     ap.add_argument("--delay", type=int, default=0, help="extra hours between decision and fill")
     ap.add_argument("--no-per-asset", action="store_true", help="portfolio only (faster)")
+    ap.add_argument("--exclude", nargs="+", default=[], help="drop these symbols (universe-subset tests)")
     ap.add_argument("--note", default="")
     args = ap.parse_args()
 
@@ -216,7 +219,7 @@ def main():
     out = LONG_DIR / args.id
     out.mkdir(parents=True, exist_ok=True)
     started = dt.datetime.now()
-    bars, tradable = load_universe(args.universe)
+    bars, tradable = load_universe(args.universe, args.exclude)
     cache = LONG_DIR / (args.targets_from or args.id) / "targets.parquet"
     if args.targets_from:
         targets = pd.read_parquet(cache)
@@ -232,7 +235,7 @@ def main():
     fee = config.TAKER_FEE if args.fee is None else args.fee
     slippage = config.SLIPPAGE_ESTIMATE / 2 if args.slippage is None else args.slippage
     metrics, trades, curves = evaluate(targets, bars, fee, slippage, args.periods, not args.no_per_asset,
-                                       minute_closes(args.universe))
+                                       minute_closes(args.universe)[list(bars)])
     metrics.to_csv(out / "metrics.csv", index=False)
     for period, tr in trades.items():
         tr.to_csv(out / f"trades_{period}.csv", index=False)
@@ -245,7 +248,7 @@ def main():
     meta = {
         "id": args.id, "universe": args.universe, "model": args.model, "params": params,
         "periods": args.periods, "fee_per_side": fee, "slippage_per_side": slippage,
-        "execution_delay_hours": args.delay, "targets_from": args.targets_from,
+        "execution_delay_hours": args.delay, "exclude": args.exclude, "targets_from": args.targets_from,
         "max_position_per_asset": config.MAX_POSITION_PER_ASSET,
         "max_portfolio_exposure": config.MAX_PORTFOLIO_EXPOSURE, "bar": "1h",
         "run_at": started.isoformat(timespec="seconds"),

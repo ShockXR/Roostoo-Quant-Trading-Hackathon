@@ -1,0 +1,8 @@
+block_start,chosen,train_sharpe
+2023-01-01,"{""lookback_days"": 14, ""market_sma_days"": 200, ""top_n"": 3}",0.0
+2023-07-01,"{""lookback_days"": 56, ""market_sma_days"": 50, ""top_n"": 3}",0.111
+2024-01-01,"{""lookback_days"": 28, ""market_sma_days"": 200, ""top_n"": 3}",1.466
+2024-07-01,"{""lookback_days"": 56, ""market_sma_days"": 50, ""top_n"": 3}",1.268
+2025-01-01,"{""lookback_days"": 14, ""market_sma_days"": 150, ""top_n"": 3}",1.745
+2025-07-01,"{""lookback_days"": 14, ""market_sma_days"": 50, ""top_n"": 3}",1.402
+2026-01-01,"{""lookback_days"": 14, ""market_sma_days"": 150, ""top_n"": 3}",1.303

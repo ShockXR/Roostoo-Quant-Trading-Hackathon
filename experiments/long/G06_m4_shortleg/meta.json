@@ -1,0 +1,25 @@
+{
+  "id": "G06_m4_shortleg",
+  "model": "m4_momentum_longshort",
+  "universe": "large_caps_2022",
+  "grid": {
+    "short_n": [
+      1,
+      2,
+      3
+    ],
+    "lookback_days": [
+      14,
+      28,
+      56
+    ]
+  },
+  "fixed": {},
+  "periods": [
+    "train",
+    "validation"
+  ],
+  "fee_per_side": 0.001,
+  "slippage_per_side": 0.00015,
+  "kind": "sweep"
+}

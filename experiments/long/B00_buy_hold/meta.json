@@ -5,7 +5,9 @@
   "params": {},
   "periods": [
     "train",
-    "validation"
+    "validation",
+    "test",
+    "full"
   ],
   "fee_per_side": 0.001,
   "slippage_per_side": 0.00015,
@@ -14,8 +16,8 @@
   "max_position_per_asset": 0.2,
   "max_portfolio_exposure": 0.7,
   "bar": "1h",
-  "run_at": "2026-10-07T20:10:39",
-  "runtime_s": 6.1,
-  "git_commit": "ee6f03b",
-  "note": "initial comparison, defaults"
+  "run_at": "2026-10-07T20:15:19",
+  "runtime_s": 16.4,
+  "git_commit": "ad95143",
+  "note": "frozen candidates; first read of test"
 }
