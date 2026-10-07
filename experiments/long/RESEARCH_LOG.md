@@ -80,3 +80,44 @@ force-closed at its last bar and is untradable afterwards.
   costs and per-asset consistency. Total return never decides alone.
 - Parameter grids are evaluated on train; the centre of a positive plateau
   is preferred over the best cell; validation must agree.
+
+## 5. Experiments
+
+Portfolio daily Sharpe / total return / max DD (minute-marked) unless stated.
+
+| ID | Hypothesis | Change | Train | Validation | Decision |
+|---|---|---|---|---|---|
+| B00 | — | Equal-weight buy & hold, 70% gross | −0.17 / −30% / −61% | 1.33 / +68% / −39% | Benchmark |
+| L00 | — | Model 0, frozen | 0.08 / −5% / −35% | −0.47 / −12% / −30% | Baseline. Losses = LUNA (May 22), June 22, FTX (Nov 22) dips |
+| G00 | Is M0's failure a parameter choice? | lookback 12–48h × k 1.5–3 | 15/16 cells negative | mixed around 0 | **Reversal family rejected** — no plateau |
+| L01 / G01 | Dip buying fails in downtrends | M0 + close > N-day SMA, N 20–200, k 1.5/2 | all k=1.5 cells positive (0.28–0.56) | k=1.5 all negative | **Rejected** — not confirmed; k=2 cells tiny |
+| L02 / G02 | Cross-sectional + absolute momentum | top-n by L-day return, L 7–90, n 2–5 | 19/20 positive (default 28/3: 0.83 / +67% / −37%) | 20/20 positive (1.78 / +112% / −32%) | **Initial winner** |
+| G03 | Vol-managed momentum cuts crashes | per-asset weight × min(1, target/σ30) | Sharpe ±0.1 vs none | ±0.2 | **Rejected** — de-levers only |
+| G04 | Momentum whipsaws in bear rallies | hold nothing unless BTC > N-day SMA, N 20–200 | N 50–200 better in 12/12 cells | better in 10/12 | **Accepted, N=100 → Model 3** (centre); N=20 hurts |
+| G05 | Diversify lookback / timing luck | average of 2–5 lookback portfolios | 0.92–1.06 (< 1.26) | 1.69–2.27 (> 1.89) | **Rejected** — inconsistent |
+| G06 | Momentum works short in risk-off | M3 + short 1–3 weakest when BTC < SMA100 | 1.01–1.64 (LUNA short helps) | 1.35–2.27, below M3 at 28d | **Rejected** |
+| L03 | — | Model 3 frozen; test read | 1.26 / +95% / −22% | 1.89 / +119% / −30% | **Test −0.16 / −8.8% / −21%** (B&H −43%) → **WINNER** |
+| R03 | Survives worse assumptions? | costs, delay, decision hour, drop-one universe, top-5 | | | Passed (full Sharpe 0.87–1.22) |
+| G07 | Post-freeze neighbourhood | lookback 14–56 × SMA 50–200, all periods | 25/25 positive | 25/25 positive | Plateau; test ≈ 0 everywhere |
+| W01 | Does re-tuning help? | 6-month walk-forward re-selection 2023–26 | | | 1.16 vs frozen 1.32 → keep frozen |
+| H_* | Holdout Jul–Sep 2026 | frozen models | | | M0 2.57 (tuned here), M3 1.25, B&H 3.51 |
+
+## Reproduce
+
+```bash
+# data (≈1.2 GB of archives; parquet in binance_data/long/processed/parquet)
+.venv/bin/python binance_downloader.py --symbols BTCUSDT ETHUSDT BNBUSDT SOLUSDT ADAUSDT XRPUSDT \
+    DOTUSDT AVAXUSDT DOGEUSDT --start 2022-01-01 --end 2026-09-30 --output-dir binance_data/long
+.venv/bin/python binance_downloader.py --symbols LUNAUSDT --start 2022-01-01 --end 2022-05-31 \
+    --output-dir binance_data/long
+.venv/bin/python -m unittest discover -s tests -v
+.venv/bin/python scripts/run_long.py --id L03_m3 --model m3_momentum_regime --periods train validation test full
+.venv/bin/python scripts/sweep_long.py --id G04_m2_market --model m2_xs_momentum \
+    --grid 'market_sma_days=[null,20,50,100,150,200]' --grid 'lookback_days=[14,28,56]' --periods train validation
+.venv/bin/python scripts/summarize_long.py B00_buy_hold L00_m0 L01_m1 L02_m2 L03_m3 --periods train validation test full
+.venv/bin/python scripts/regime_long.py B00_buy_hold L00_m0 L01_m1 L02_m2 L03_m3
+.venv/bin/python scripts/walkforward_long.py --id W01_m3 --model m2_xs_momentum \
+    --grid 'lookback_days=[14,21,28,42,56]' --grid 'market_sma_days=[50,75,100,150,200]' --fixed top_n=3 \
+    --frozen '{"lookback_days": 28, "market_sma_days": 100}'
+.venv/bin/python scripts/run_live.py --once
+```
