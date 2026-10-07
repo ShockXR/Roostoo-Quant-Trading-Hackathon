@@ -19,8 +19,8 @@ import sys
 import pandas as pd
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from common import LONG_PERIODS, LONG_UNIVERSES, register_package  # noqa: E402
-from run_long import LONG_DIR, evaluate, load_universe, minute_closes  # noqa: E402
+from common import LONG_PERIODS, register_package  # noqa: E402
+from run_long import LONG_DIR, UNIVERSE_CHOICES, default_slippage, evaluate, load_any  # noqa: E402
 
 COLS = ["total_return", "annualized_return", "max_drawdown", "sharpe_daily", "sortino_daily", "calmar",
         "volatility_annual", "profit_factor", "win_rate", "n_trades", "avg_gross_exposure", "turnover",
@@ -32,7 +32,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--id", required=True)
     ap.add_argument("--model", required=True)
-    ap.add_argument("--universe", default="large_caps_2022", choices=LONG_UNIVERSES)
+    ap.add_argument("--universe", default="large_caps_2022", choices=UNIVERSE_CHOICES)
     ap.add_argument("--grid", action="append", required=True, help="key=[v1,v2,...] (JSON list), repeatable")
     ap.add_argument("--fixed", action="append", help="key=value held constant (JSON value)")
     ap.add_argument("--periods", nargs="+", default=["train"], choices=LONG_PERIODS)
@@ -46,16 +46,16 @@ def main():
     grid = {k: json.loads(v) for k, v in (g.split("=", 1) for g in args.grid)}
     fixed = {k: json.loads(v) for k, v in (f.split("=", 1) for f in args.fixed or [])}
     fee = config.TAKER_FEE if args.fee is None else args.fee
-    slippage = config.SLIPPAGE_ESTIMATE / 2 if args.slippage is None else args.slippage
-    bars, tradable = load_universe(args.universe)
-    close_1m = minute_closes(args.universe)
+    slippage = default_slippage(args.universe) if args.slippage is None else args.slippage
+    bars, tradable, eligible, close_1m = load_any(args.universe)
 
     rows = []
     for combo in itertools.product(*grid.values()):
         params = {**fixed, **dict(zip(grid, combo))}
-        t = strategies.generate(args.model, bars, params)
+        t = strategies.generate(args.model, bars, params, eligible=eligible)
         t = t.reindex(columns=list(bars)).where(tradable, 0.0).fillna(0.0)
-        m, _, _ = evaluate(t, bars, fee, slippage, args.periods, per_asset=False, close_1m=close_1m)
+        m, _, _ = evaluate(t, bars, fee, slippage, args.periods, per_asset=False, close_1m=close_1m,
+                           eligible=eligible)
         for _, r in m.iterrows():
             rows.append({**params, "period": r["period"], **{c: r.get(c) for c in COLS}})
         print(json.dumps(params), " ".join(f"{r['period']}: SR {r['sharpe_daily']:.2f} ret {r['total_return']:+.1%}"

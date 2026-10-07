@@ -94,6 +94,36 @@ def load_universe(universe: str, exclude: list[str] | None = None) -> tuple[dict
     return bars, pd.DataFrame(tradable)
 
 
+MID = "mid_caps_pit"
+UNIVERSE_CHOICES = [*LONG_UNIVERSES, MID]
+# Mid-cap base slippage per side: half a tick is already ~5-6 bp on ARB/ENA
+# and ~2 bp on CRV (experiments/midcaps/EXPERIMENT_LOG.md); large caps 1.5 bp.
+MID_SLIPPAGE = 0.0005
+
+
+def default_slippage(universe: str) -> float:
+    from roostoo import config
+    return MID_SLIPPAGE if universe == MID else config.SLIPPAGE_ESTIMATE / 2
+
+
+def load_any(universe: str, exclude: list[str] | None = None):
+    """(bars, tradable, eligible, close_1m). Large caps: every listed asset is
+    eligible and drawdowns are re-marked on 1m closes. Point-in-time mid caps
+    (scripts/midcap_data.py): monthly membership, hourly marks only."""
+    if universe == MID:
+        from midcap_data import load_mid_universe
+        bars, tradable, eligible = load_mid_universe(exclude)
+        return bars, tradable, eligible, None
+    bars, tradable = load_universe(universe, exclude)
+    return bars, tradable, None, minute_closes(universe)[list(bars)]
+
+
+def basket(closes: pd.DataFrame, eligible: pd.DataFrame) -> pd.Series:
+    """Equal-weight index of the assets eligible each hour (point-in-time)."""
+    r = closes.pct_change().where(eligible.shift(1, fill_value=False)).mean(axis=1).fillna(0.0)
+    return (1 + r).cumprod()
+
+
 def minute_closes(universe: str) -> pd.DataFrame:
     """1m close panel over the full window (cached, float32), for marking
     hourly runs to the minute."""
@@ -156,7 +186,8 @@ def window_stats(equity: pd.Series, days: int = 14) -> dict:
 
 
 def evaluate(targets: pd.DataFrame, bars: dict, fee: float, slippage: float, periods: list[str],
-             per_asset: bool, close_1m: pd.DataFrame, capital: float = 100_000.0):
+             per_asset: bool, close_1m: pd.DataFrame | None, capital: float = 100_000.0,
+             eligible: pd.DataFrame | None = None):
     from roostoo import config
     from roostoo.backtest.metrics import report
     from roostoo.backtest.simulator import Costs, simulate
@@ -172,15 +203,20 @@ def evaluate(targets: pd.DataFrame, bars: dict, fee: float, slippage: float, per
             cols = list(bars) if sym == "PORTFOLIO" else [sym]
             res = simulate(o[cols], c[cols], w[cols], initial_capital=capital, costs=costs,
                            max_gross_exposure=config.MAX_PORTFOLIO_EXPOSURE if sym == "PORTFOLIO" else None)
-            bench = (c[cols] / c[cols].iloc[0]).mean(axis=1)
+            if eligible is not None and sym == "PORTFOLIO":
+                bench = basket(c[cols], period_slice(eligible, period, LONG_PERIODS)[cols])
+            else:
+                bench = (c[cols] / c[cols].iloc[0]).mean(axis=1)
             row = {"period": period, "asset": sym, **report(res, bench, bar_minutes=60)}
             if sym == "PORTFOLIO":
                 # drawdown and Calmar from minute marks (hourly marks hide intra-hour dips)
-                eq1m = minute_equity(res, close_1m)
                 row["max_drawdown_hourly"] = row["max_drawdown"]
-                e = pd.concat([pd.Series([capital]), eq1m.reset_index(drop=True)])
-                row["max_drawdown"] = float((e / e.cummax() - 1).min())
-                row["calmar"] = row["annualized_return"] / abs(row["max_drawdown"]) if row["max_drawdown"] < 0 else 0.0
+                if close_1m is not None:
+                    eq1m = minute_equity(res, close_1m)
+                    e = pd.concat([pd.Series([capital]), eq1m.reset_index(drop=True)])
+                    row["max_drawdown"] = float((e / e.cummax() - 1).min())
+                    row["calmar"] = (row["annualized_return"] / abs(row["max_drawdown"])
+                                     if row["max_drawdown"] < 0 else 0.0)
                 row.update(window_stats(res.equity))
                 trades[period] = res.trades
                 curves[period] = res.equity
@@ -199,7 +235,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--id", required=True, help="experiment id; output under experiments/long/<id>")
     ap.add_argument("--model", default="m0_reversal", help="see strategies.MODELS")
-    ap.add_argument("--universe", default="large_caps_2022", choices=LONG_UNIVERSES)
+    ap.add_argument("--universe", default="large_caps_2022", choices=UNIVERSE_CHOICES)
     ap.add_argument("--param", action="append", help="key=value (JSON value), repeatable")
     ap.add_argument("--periods", nargs="+", default=["train", "validation"], choices=LONG_PERIODS,
                     help="test and holdout are excluded by default")
@@ -219,12 +255,12 @@ def main():
     out = LONG_DIR / args.id
     out.mkdir(parents=True, exist_ok=True)
     started = dt.datetime.now()
-    bars, tradable = load_universe(args.universe, args.exclude)
+    bars, tradable, eligible, close_1m = load_any(args.universe, args.exclude)
     cache = LONG_DIR / (args.targets_from or args.id) / "targets.parquet"
     if args.targets_from:
         targets = pd.read_parquet(cache)
     else:
-        targets = strategies.generate(args.model, bars, params)
+        targets = strategies.generate(args.model, bars, params, eligible=eligible)
         # not tradable -> flat; for a delisted asset this is the forced exit,
         # filled at the next bar's open = its last price
         targets = targets.reindex(columns=list(bars)).where(tradable, 0.0).fillna(0.0)
@@ -233,9 +269,9 @@ def main():
         targets = targets.shift(args.delay).fillna(0.0)
 
     fee = config.TAKER_FEE if args.fee is None else args.fee
-    slippage = config.SLIPPAGE_ESTIMATE / 2 if args.slippage is None else args.slippage
+    slippage = default_slippage(args.universe) if args.slippage is None else args.slippage
     metrics, trades, curves = evaluate(targets, bars, fee, slippage, args.periods, not args.no_per_asset,
-                                       minute_closes(args.universe)[list(bars)])
+                                       close_1m, eligible=eligible)
     metrics.to_csv(out / "metrics.csv", index=False)
     for period, tr in trades.items():
         tr.to_csv(out / f"trades_{period}.csv", index=False)

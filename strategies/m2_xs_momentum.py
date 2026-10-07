@@ -44,6 +44,8 @@ def targets(bars: dict[str, pd.DataFrame], params: dict) -> pd.DataFrame:
     score = close / close.shift(lookback * 24) - 1
     decide = close.index.hour == int(p["decision_hour"])
     s = score[decide]
+    if p.get("_eligible") is not None:          # point-in-time universe: rank members only
+        s = s.where(p["_eligible"].reindex_like(score)[decide].fillna(False).astype(bool))
     rank = s.where(s > 0).rank(axis=1, ascending=False, method="first")
     w = (rank <= top_n).astype(float) * weight
     if p["vol_target"]:

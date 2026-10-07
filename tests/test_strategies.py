@@ -34,8 +34,10 @@ def minute_candles(n_days=40, seed=1, drift=0.0):
 
 
 def universe(n_assets=4, n_days=40):
-    return {f"A{i}": hourly_bars(minute_candles(n_days, seed=i, drift=(i - 1.5) * 2e-6))
+    bars = {f"A{i}": hourly_bars(minute_candles(n_days, seed=i, drift=(i - 1.5) * 2e-6))
             for i in range(n_assets)}
+    bars["BTCUSDT"] = bars["A0"].copy()     # market proxy for the regime filters
+    return bars
 
 
 class FeaturesTest(unittest.TestCase):
@@ -77,6 +79,8 @@ class NoLookaheadTest(unittest.TestCase):
         "m1_reversal_trend": {"k": 1.0, "trend_days": 5},
         "m2_xs_momentum": {"lookback_days": 5, "top_n": 2},
         "buy_hold": {},
+        "mc_momentum": {"lookback_days": 5, "top_n": 2, "skip_days": 1, "score": "sharpe", "weighting": "inv_vol",
+                        "regime": "basket", "regime_sma_days": 3, "rebalance_days": 2},
     }
 
     def test_targets_up_to_t_ignore_bars_after_t(self):
@@ -97,6 +101,31 @@ class NoLookaheadTest(unittest.TestCase):
         for name, params in self.PARAMS.items():
             t = strategies.generate(name, bars, params)
             self.assertTrue(((t >= 0) & (t <= 0.2 + 1e-12)).all(axis=None), name)
+
+
+class MidcapMomentumTest(unittest.TestCase):
+    def test_defaults_reproduce_model_three(self):
+        bars = universe(n_assets=5, n_days=60)
+        p = {"lookback_days": 5, "regime_sma_days": 10}
+        m3 = strategies.generate("m3_momentum_regime", bars, {"lookback_days": 5, "market_sma_days": 10})
+        pd.testing.assert_frame_equal(strategies.generate("mc_momentum", bars, p), m3)
+
+    def test_eligibility_restricts_selection_and_closes_positions(self):
+        bars = universe(n_assets=5)
+        idx = bars["A0"].index
+        elig = pd.DataFrame(True, index=idx, columns=list(bars))
+        elig[["A1", "A2"]] = False
+        t = strategies.generate("mc_momentum", bars, {"lookback_days": 5, "regime": None}, eligible=elig)
+        self.assertTrue((t[["A1", "A2"]] == 0).all(axis=None))
+        self.assertGreater(t.drop(columns=["A1", "A2"]).to_numpy().sum(), 0)
+
+    def test_inverse_vol_keeps_total_and_cap(self):
+        bars = universe(n_assets=5)
+        t = strategies.generate("mc_momentum", bars, {"lookback_days": 5, "top_n": 3, "weighting": "inv_vol",
+                                                      "regime": None})
+        gross = t.sum(axis=1)
+        self.assertLessEqual(t.max().max(), 0.2 + 1e-12)
+        self.assertLessEqual(gross.max(), 0.6 + 1e-9)
 
 
 class ModelOneTest(unittest.TestCase):

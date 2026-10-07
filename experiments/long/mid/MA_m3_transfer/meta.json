@@ -1,0 +1,22 @@
+{
+  "id": "mid/MA_m3_transfer",
+  "universe": "mid_caps_pit",
+  "model": "m3_momentum_regime",
+  "params": {},
+  "periods": [
+    "train",
+    "validation"
+  ],
+  "fee_per_side": 0.001,
+  "slippage_per_side": 0.0005,
+  "execution_delay_hours": 0,
+  "exclude": [],
+  "targets_from": null,
+  "max_position_per_asset": 0.2,
+  "max_portfolio_exposure": 0.7,
+  "bar": "1h",
+  "run_at": "2026-10-07T22:58:14",
+  "runtime_s": 4.4,
+  "git_commit": "6dc967a",
+  "note": "mid-cap baseline, unchanged model"
+}

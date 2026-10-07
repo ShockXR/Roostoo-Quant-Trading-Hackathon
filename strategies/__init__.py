@@ -11,7 +11,8 @@ live loop trades.
 """
 import pandas as pd
 
-from . import m0_reversal, m1_reversal_trend, m2_xs_momentum, m3_momentum_regime, m4_momentum_longshort
+from . import (m0_reversal, m1_reversal_trend, m2_xs_momentum, m3_momentum_regime, m4_momentum_longshort,
+               mc_momentum)
 
 
 def _buy_hold(bars: dict[str, pd.DataFrame], params: dict) -> pd.DataFrame:
@@ -29,8 +30,19 @@ MODELS = {
     "m2_xs_momentum": m2_xs_momentum.targets,
     "m3_momentum_regime": m3_momentum_regime.targets,
     "m4_momentum_longshort": m4_momentum_longshort.targets,
+    "mc_momentum": mc_momentum.targets,
 }
 
 
-def generate(name: str, bars: dict[str, pd.DataFrame], params: dict | None = None) -> pd.DataFrame:
-    return MODELS[name](bars, params or {})
+def generate(name: str, bars: dict[str, pd.DataFrame], params: dict | None = None,
+             eligible: pd.DataFrame | None = None) -> pd.DataFrame:
+    """eligible: optional (time x symbol) bool mask of the point-in-time
+    universe. Models only select eligible assets, and any position in an
+    asset that is not eligible is closed."""
+    params = dict(params or {})
+    if eligible is not None:
+        params["_eligible"] = eligible
+    t = MODELS[name](bars, params)
+    if eligible is not None:
+        t = t.where(eligible.reindex_like(t).fillna(False).astype(bool), 0.0)
+    return t

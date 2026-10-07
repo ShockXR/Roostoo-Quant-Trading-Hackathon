@@ -40,6 +40,13 @@ def resolve(params: dict) -> dict:
     }
 
 
+def eligible_entries(sig: pd.DataFrame, params: dict) -> pd.DataFrame:
+    """Entries only where params["_eligible"] (point-in-time universe mask) allows."""
+    elig = params.get("_eligible")
+    return sig if elig is None else sig & elig.reindex_like(sig).fillna(False).astype(bool)
+
+
 def targets(bars: dict[str, pd.DataFrame], params: dict) -> pd.DataFrame:
     p = resolve(params)
-    return hold_signal(signal(bars, p["lookback"], p["k"]), p["hold"]) * p["weight"]
+    sig = eligible_entries(signal(bars, p["lookback"], p["k"]), params)
+    return hold_signal(sig, p["hold"]) * p["weight"]

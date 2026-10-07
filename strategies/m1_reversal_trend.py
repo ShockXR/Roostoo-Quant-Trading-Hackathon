@@ -28,4 +28,5 @@ def targets(bars: dict[str, pd.DataFrame], params: dict) -> pd.DataFrame:
     p = m0_reversal.resolve(params)
     trend_days = int(params.get("trend_days", DEFAULTS["trend_days"]))
     sig = m0_reversal.signal(bars, p["lookback"], p["k"]) & uptrend(bars, trend_days)
+    sig = m0_reversal.eligible_entries(sig, params)
     return m0_reversal.hold_signal(sig, p["hold"]) * p["weight"]
