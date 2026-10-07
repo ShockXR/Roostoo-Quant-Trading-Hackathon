@@ -105,6 +105,12 @@ one-off manual script hitting `place_order` directly.
 
 ## Part 6 — Before going fully live
 
+The service runs `scripts/run_live.py`, which trades `config.PRODUCTION_MODEL`
+(Model 3, momentum + BTC regime filter; see `MODEL_RESEARCH_REPORT.md`) once an
+hour. It paper-trades by default; add `ROOSTOO_LIVE=1` to `.env` to send real
+orders. `scripts/run_live.py --once` prints one decision and exits — run it
+first to check data access, prices and order sizes.
+
 1. **Run with `DRY_RUN = True` first** (default in `main.py`) for at least a
    few hours after deployment — watch `logs/bot.log` and confirm the
    decisions it *would* make look sane before flipping it to live orders.

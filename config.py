@@ -155,3 +155,28 @@ REVERSAL_LOOKBACK_BARS = 1440   # 1 day of 1m bars
 REVERSAL_K = 1.5
 REVERSAL_HOLD_BARS = 1440
 REVERSAL_CHECK_EVERY = 60       # minutes
+
+# --- Production model (model-research branch) ---
+# Chosen on 2022-01 .. 2026-09 Binance history; evidence in
+# experiments/long/RESEARCH_LOG.md and MODEL_RESEARCH_REPORT.md.
+# Model 3: once a day at the 23:00 UTC bar close, hold the 3 assets with the
+# highest positive 28-day return at 20% each, only while BTC closes above its
+# 100-day SMA; otherwise cash. strategies/m3_momentum_regime.py.
+PRODUCTION_MODEL = "m3_momentum_regime"
+PRODUCTION_PARAMS: dict = {}          # frozen defaults live in the model module
+# The tested universe: the 2022-01-01 top-10 large caps that still trade
+# (LUNA was delisted in May 2022). Binance symbol -> Roostoo pair.
+PRODUCTION_SYMBOLS = {
+    "BTCUSDT": "BTC/USD", "ETHUSDT": "ETH/USD", "BNBUSDT": "BNB/USD", "SOLUSDT": "SOL/USD",
+    "ADAUSDT": "ADA/USD", "XRPUSDT": "XRP/USD", "DOTUSDT": "DOT/USD", "AVAXUSDT": "AVAX/USD",
+    "DOGEUSDT": "DOGE/USD",
+}
+BINANCE_KLINES_URL = "https://data-api.binance.vision/api/v3/klines"   # public, no key
+LIVE_HISTORY_DAYS = 130            # >= 100-day SMA + 28-day lookback, with margin
+LIVE_STATE_FILE = "data_store/live_state.json"
+LIVE_RECONCILE_TOLERANCE = 0.02    # on a fresh start, fix positions > 2% of equity off target
+# Drawdown stop for the live loop (fraction from peak equity; None = off).
+# Off by default: on Model 3's 2022-2026 history a 12% stop fired in 7.6% of
+# 14-day windows, cut the mean 14-day return from +1.48% to +0.90% and did
+# not improve the worst 5% of windows (-7.3% vs -7.0%).
+LIVE_KILL_SWITCH_DRAWDOWN: float | None = None
