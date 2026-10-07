@@ -1,0 +1,27 @@
+{
+  "id": "mid/G11_core",
+  "model": "mc_momentum",
+  "universe": "mid_caps_pit",
+  "grid": {
+    "lookback_days": [
+      7,
+      14,
+      28,
+      56,
+      90
+    ],
+    "top_n": [
+      3,
+      5,
+      8
+    ]
+  },
+  "fixed": {},
+  "periods": [
+    "train",
+    "validation"
+  ],
+  "fee_per_side": 0.001,
+  "slippage_per_side": 0.0005,
+  "kind": "sweep"
+}

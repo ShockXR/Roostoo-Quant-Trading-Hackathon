@@ -26,7 +26,7 @@ import pandas as pd
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from common import register_package  # noqa: E402
-from run_long import LONG_DIR, load_universe  # noqa: E402
+from run_long import LONG_DIR, load_any  # noqa: E402
 
 
 def main():
@@ -37,11 +37,13 @@ def main():
     args = ap.parse_args()
     register_package()
 
-    bars, tradable = load_universe(args.universe)
+    bars, tradable, eligible, _ = load_any(args.universe)
     close = pd.DataFrame({s: b["close"] for s, b in bars.items()})
-    # basket of what was tradable each day: mean of daily returns of live assets
+    # basket of what was in the universe each day (eligible members for the
+    # point-in-time mid caps, every listed asset for the large caps)
     daily_px = close.resample("1D").last()
-    live = tradable.resample("1D").last()
+    live = (tradable if eligible is None else eligible).resample("1D").last()
+    daily_px, live = daily_px.loc["2022-01-01":], live.loc["2022-01-01":]
     basket_r = daily_px.pct_change().where(live).mean(axis=1).fillna(0.0)
     basket = (1 + basket_r).cumprod()
 

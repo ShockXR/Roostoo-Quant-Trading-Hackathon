@@ -1,5 +1,6 @@
 """
-Live loop for the production model (config.PRODUCTION_MODEL).
+Live loop for the production model (config.PRODUCTION_MODEL, the large-cap
+book) or, with book="mid", the mid-cap model (config.MIDCAP_MODEL).
 
 Once an hour, shortly after the hour closes:
   1. fetch finished hourly bars for config.PRODUCTION_SYMBOLS (Binance public
@@ -63,8 +64,11 @@ class RoostooBroker:
         return ok
 
 
-def latest_targets(now_ms: int | None = None) -> tuple[pd.Timestamp, dict[str, float]]:
+def latest_targets(now_ms: int | None = None, book: str = "large",
+                   pair_info: dict | None = None) -> tuple[pd.Timestamp, dict[str, float]]:
     """Target weight per Roostoo pair from the latest finished hourly bar."""
+    if book == "mid":
+        return _latest_mid_targets(now_ms, pair_info or {})
     bars = {s: fetch_hourly(s, config.LIVE_HISTORY_DAYS, now_ms) for s in config.PRODUCTION_SYMBOLS}
     idx = sorted(set.intersection(*(set(b.index) for b in bars.values())))
     bars = {s: b.loc[idx] for s, b in bars.items()}
@@ -73,26 +77,59 @@ def latest_targets(now_ms: int | None = None) -> tuple[pd.Timestamp, dict[str, f
     return t.index[-1], {config.PRODUCTION_SYMBOLS[s]: float(last[s]) for s in t.columns}
 
 
-def _prices() -> dict[str, float]:
+def _latest_mid_targets(now_ms: int | None, pair_info: dict) -> tuple[pd.Timestamp, dict[str, float]]:
+    """Mid-cap book: this month's liquidity ranks 21-40 that Roostoo lists,
+    ranked and regime-filtered exactly as in the backtest (past months use
+    their own membership), BTC as the market proxy."""
+    from .data.binance_universe import mid_membership
+    listed = {p.split("/")[0] for p, v in pair_info.items()
+              if v.get("CanTrade", True) and v.get("AssetType", "crypto") == "crypto"}
+    months = {m: [s for s in syms if s[:-4] in listed] for m, syms in mid_membership(now_ms).items()}
+    symbols = sorted({s for syms in months.values() for s in syms})
+    market = "BTCUSDT"
+    raw = {s: fetch_hourly(s, config.MIDCAP_HISTORY_DAYS, now_ms) for s in symbols + [market]}
+    idx = raw[market].index
+    bars, live = {}, {}
+    for s, b in raw.items():
+        live[s] = pd.Series((idx >= b.index[0]) & (idx <= b.index[-1]), index=idx) if len(b) else \
+            pd.Series(False, index=idx)
+        b = b.reindex(idx)
+        b["close"] = b["close"].ffill().bfill()
+        for col in ("open", "high", "low"):
+            b[col] = b[col].fillna(b["close"])
+        bars[s] = b.fillna({"volume": 0.0})
+    month = pd.Series(idx.strftime("%Y-%m"), index=idx)
+    eligible = pd.DataFrame({s: month.map(lambda m, s=s: s in months.get(m, [])) & live[s] for s in bars})
+    eligible[market] = False
+    t = strategies.generate(config.MIDCAP_MODEL, bars, config.MIDCAP_PARAMS, eligible=eligible)
+    last = t.iloc[-1]
+    return t.index[-1], {f"{s[:-4]}/USD": float(last[s]) for s in symbols}
+
+
+def _prices(pairs) -> dict[str, float]:
     from .execution.trader import get_ticker
     resp = get_ticker()
     if not resp or not resp.get("Success"):
         raise RuntimeError(f"ticker failed: {resp}")
-    return {p: float(resp["Data"][p]["LastPrice"]) for p in config.PRODUCTION_SYMBOLS.values()}
+    data = resp["Data"]
+    return {p: float(data[p]["LastPrice"]) for p in pairs if p in data}
 
 
 def _load_state(path: pathlib.Path) -> dict:
     return json.loads(path.read_text()) if path.exists() else {}
 
 
-def run_once(broker, state: dict, pair_info: dict, now_ms: int | None = None) -> dict:
-    bar_time, targets = latest_targets(now_ms)
+def run_once(broker, state: dict, pair_info: dict, now_ms: int | None = None, book: str = "large") -> dict:
+    bar_time, targets = latest_targets(now_ms, book, pair_info)
+    # a pair dropped from the universe since the last run is closed, not forgotten
+    targets = {**{p: 0.0 for p in (state.get("targets") or {})}, **targets}
     expected = pd.Timestamp(now_ms or time.time() * 1000, unit="ms", tz="UTC").floor("1h") - pd.Timedelta("1h")
     if bar_time < expected:
         log.warning("latest bar %s is stale (expected %s); not trading this hour", bar_time, expected)
         return state
     targets = rebalance.cap_gross(targets)
-    prices = _prices()
+    prices = _prices(targets)
+    targets = {p: w for p, w in targets.items() if p in prices}   # pair no longer quoted: skip
     holdings = broker.balance()
     equity = holdings.get("USD", 0.0) + sum(holdings.get(p.split("/")[0], 0.0) * prices[p] for p in targets)
 
@@ -124,11 +161,14 @@ def run_once(broker, state: dict, pair_info: dict, now_ms: int | None = None) ->
             "equity": equity, "paper_holdings": broker.balance() if DRY_RUN else None}
 
 
-def run_forever():
+def run_forever(book: str = config.LIVE_BOOK):
+    """book: "large" (config.PRODUCTION_MODEL, the competition default) or
+    "mid" (config.MIDCAP_MODEL). Each book keeps its own state file."""
     from .execution.trader import get_exchange_info
     info = get_exchange_info()
     pair_info = info["TradePairs"]
-    path = pathlib.Path(config.LIVE_STATE_FILE)
+    path = pathlib.Path(config.LIVE_STATE_FILE.replace(".json", f"_{book}.json") if book != "large"
+                        else config.LIVE_STATE_FILE)
     path.parent.mkdir(parents=True, exist_ok=True)
     state = _load_state(path)
     if DRY_RUN:
@@ -137,10 +177,11 @@ def run_forever():
             broker.holdings = state["paper_holdings"]
     else:
         broker = RoostooBroker()
-    log.info("model %s, %d pairs, DRY_RUN=%s", config.PRODUCTION_MODEL, len(config.PRODUCTION_SYMBOLS), DRY_RUN)
+    model = config.MIDCAP_MODEL if book == "mid" else config.PRODUCTION_MODEL
+    log.info("book %s, model %s, DRY_RUN=%s", book, model, DRY_RUN)
     while True:
         try:
-            state = run_once(broker, state, pair_info)
+            state = run_once(broker, state, pair_info, book=book)
             path.write_text(json.dumps(state, indent=2))
         except Exception:
             log.exception("error in live loop; retrying next hour")

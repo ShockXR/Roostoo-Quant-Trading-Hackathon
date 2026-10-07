@@ -180,3 +180,15 @@ LIVE_RECONCILE_TOLERANCE = 0.02    # on a fresh start, fix positions > 2% of equ
 # 14-day windows, cut the mean 14-day return from +1.48% to +0.90% and did
 # not improve the worst 5% of windows (-7.3% vs -7.0%).
 LIVE_KILL_SWITCH_DRAWDOWN: float | None = None
+
+# --- Mid-cap book (branch midcap-model-research) ---
+# Not the competition default: a 50/50 split with the large-cap book did not
+# beat the large-cap model alone in any period (daily-return correlation
+# 0.59). Evidence: MIDCAP_RESEARCH_REPORT.md.
+# Model: hold the 3 strongest positive 28-day movers among this month's
+# liquidity ranks 21-40 (Binance USDT, 90-day volume) that Roostoo lists,
+# 20% each, only while BTC > 100-day SMA AND the mid-cap basket > 150-day SMA.
+LIVE_BOOK = "large"                # "large" | "mid"; scripts/run_live.py --book overrides
+MIDCAP_MODEL = "mid_momentum"      # strategies/mid_momentum.py
+MIDCAP_PARAMS: dict = {}
+MIDCAP_HISTORY_DAYS = 200          # >= 150-day basket SMA + 28-day lookback, with margin

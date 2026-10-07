@@ -1,0 +1,25 @@
+{
+  "id": "mid/G13_signal",
+  "model": "mc_momentum",
+  "universe": "mid_caps_pit",
+  "grid": {
+    "skip_days": [
+      0,
+      1,
+      3,
+      7
+    ],
+    "score": [
+      "return",
+      "sharpe"
+    ]
+  },
+  "fixed": {},
+  "periods": [
+    "train",
+    "validation"
+  ],
+  "fee_per_side": 0.001,
+  "slippage_per_side": 0.0005,
+  "kind": "sweep"
+}

@@ -1,0 +1,8 @@
+block_start,chosen,train_sharpe
+2023-01-01,"{""btc_sma_days"": 200, ""lookback_days"": 14, ""regime_sma_days"": 100}",0.0
+2023-07-01,"{""btc_sma_days"": 200, ""lookback_days"": 28, ""regime_sma_days"": 100}",0.516
+2024-01-01,"{""btc_sma_days"": 200, ""lookback_days"": 56, ""regime_sma_days"": 100}",1.069
+2024-07-01,"{""btc_sma_days"": 200, ""lookback_days"": 28, ""regime_sma_days"": 100}",1.18
+2025-01-01,"{""btc_sma_days"": 200, ""lookback_days"": 28, ""regime_sma_days"": 100}",1.102
+2025-07-01,"{""btc_sma_days"": 200, ""lookback_days"": 28, ""regime_sma_days"": 100}",0.91
+2026-01-01,"{""btc_sma_days"": 200, ""lookback_days"": 28, ""regime_sma_days"": 100}",0.888

@@ -1,0 +1,29 @@
+{
+  "id": "mid/G15_regime_both",
+  "model": "mc_momentum",
+  "universe": "mid_caps_pit",
+  "grid": {
+    "regime": [
+      "both"
+    ],
+    "regime_sma_days": [
+      50,
+      100,
+      150,
+      200
+    ],
+    "btc_sma_days": [
+      50,
+      100,
+      200
+    ]
+  },
+  "fixed": {},
+  "periods": [
+    "train",
+    "validation"
+  ],
+  "fee_per_side": 0.001,
+  "slippage_per_side": 0.0005,
+  "kind": "sweep"
+}

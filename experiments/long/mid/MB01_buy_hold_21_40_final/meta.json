@@ -1,0 +1,25 @@
+{
+  "id": "mid/MB01_buy_hold_21_40_final",
+  "universe": "mid_caps_pit_21_40",
+  "model": "buy_hold",
+  "params": {},
+  "periods": [
+    "train",
+    "validation",
+    "test",
+    "holdout",
+    "full"
+  ],
+  "fee_per_side": 0.001,
+  "slippage_per_side": 0.0005,
+  "execution_delay_hours": 0,
+  "exclude": [],
+  "targets_from": "mid/MB01_buy_hold_21_40",
+  "max_position_per_asset": 0.2,
+  "max_portfolio_exposure": 0.7,
+  "bar": "1h",
+  "run_at": "2026-10-07T23:14:35",
+  "runtime_s": 4.0,
+  "git_commit": "0c61639",
+  "note": ""
+}

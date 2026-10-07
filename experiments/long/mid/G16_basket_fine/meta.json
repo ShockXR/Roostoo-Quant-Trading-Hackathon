@@ -1,0 +1,29 @@
+{
+  "id": "mid/G16_basket_fine",
+  "model": "mc_momentum",
+  "universe": "mid_caps_pit",
+  "grid": {
+    "regime": [
+      "basket"
+    ],
+    "regime_sma_days": [
+      150,
+      200,
+      250,
+      300
+    ],
+    "lookback_days": [
+      14,
+      28,
+      56
+    ]
+  },
+  "fixed": {},
+  "periods": [
+    "train",
+    "validation"
+  ],
+  "fee_per_side": 0.001,
+  "slippage_per_side": 0.0005,
+  "kind": "sweep"
+}

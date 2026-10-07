@@ -38,19 +38,12 @@ DV = "https://data.binance.vision"
 
 FIRST_MONTH, LAST_MONTH = "2021-06", "2026-09"
 FIRST_MEMBER_MONTH = "2022-01"
-MIN_AGE_DAYS = 90
-VOLUME_DAYS = 90                  # size proxy: 90-day mean volume (30 days churned with every pump)
-TRADED_DAYS = 30                  # and traded on each of the last 30 days
-MID_RANKS = (21, 60)              # 1-20 = large-cap tier (volume ranks sit below market-cap ranks:
-                                  # with 1-10, ADA/AVAX/DOT/DOGE were "mid caps" in 2022)
+sys.path.insert(0, str(ROOT / "scripts"))
+from common import register_package  # noqa: E402
 
-# not tradable "assets": stablecoins, fiat, wrapped / liquid-staking receipts
-EXCLUDED_BASES = {
-    "USDC", "BUSD", "TUSD", "USDP", "PAX", "DAI", "FDUSD", "UST", "USDS", "SUSD", "USDSB", "EUR", "GBP",
-    "AUD", "BRL", "TRY", "RUB", "UAH", "NGN", "ZAR", "BIDR", "IDRT", "BVND", "EURI", "AEUR", "XUSD", "USDE",
-    "RLUSD", "PYUSD", "BFUSD", "USD1", "USDT", "WBTC", "WBETH", "BETH", "BNSOL", "PAXG", "XAUT", "USDJ",
-}
-LEVERAGED = re.compile(r".+(UP|DOWN|BULL|BEAR)$")
+register_package()
+from roostoo.strategies.universe import LARGE_RANKS, MID_RANKS, is_candidate, ranks  # noqa: E402
+
 SESSION = requests.Session()
 
 
@@ -85,7 +78,7 @@ def stage_list():
     prefixes = list_prefixes("data/spot/monthly/klines/")
     syms = sorted({p.rstrip("/").split("/")[-1] for p in prefixes})
     usdt = [s for s in syms if s.endswith("USDT")]
-    keep = [s for s in usdt if s[:-4] not in EXCLUDED_BASES and not LEVERAGED.match(s[:-4])]
+    keep = [s for s in usdt if is_candidate(s)]
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "symbols.json").write_text(json.dumps(keep))
     print(f"{len(syms)} symbols, {len(usdt)} USDT, {len(keep)} candidates")
@@ -131,24 +124,13 @@ def stage_daily(workers: int):
     print(f"daily bars for {len(res)} symbols")
 
 
-def membership(qvol: pd.DataFrame, close: pd.DataFrame) -> pd.DataFrame:
-    """Rows: month start; columns: symbol -> liquidity rank (NaN = not eligible)."""
-    first = close.apply(lambda c: c.first_valid_index())
-    rows = {}
-    for m in pd.date_range(FIRST_MEMBER_MONTH, f"{LAST_MONTH}-01", freq="MS", tz="UTC"):
-        win = qvol[(qvol.index >= m - pd.Timedelta(days=VOLUME_DAYS)) & (qvol.index < m)]
-        traded = (win.tail(TRADED_DAYS) > 0).sum() == TRADED_DAYS
-        old = first <= m - pd.Timedelta(days=MIN_AGE_DAYS)
-        eligible = traded & old.reindex(traded.index).fillna(False)
-        rows[m] = win.mean()[eligible].rank(ascending=False, method="first")
-    return pd.DataFrame(rows).T
-
-
 def stage_members():
     close = pd.read_parquet(OUT / "daily_close.parquet")
     qvol = pd.read_parquet(OUT / "daily_qvol.parquet")
-    rank = membership(qvol, close)
+    months = pd.date_range(FIRST_MEMBER_MONTH, f"{LAST_MONTH}-01", freq="MS", tz="UTC")
+    rank = ranks(qvol, close, months)
     lo, hi = MID_RANKS
+    assert LARGE_RANKS[1] + 1 == lo
     rows = []
     for m, r in rank.iterrows():
         for s, k in r.dropna().items():

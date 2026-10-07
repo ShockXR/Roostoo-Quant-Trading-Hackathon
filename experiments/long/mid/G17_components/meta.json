@@ -1,0 +1,36 @@
+{
+  "id": "mid/G17_components",
+  "model": "mc_momentum",
+  "universe": "mid_caps_pit",
+  "grid": {
+    "lookback_days": [
+      14,
+      28,
+      56
+    ],
+    "weighting": [
+      "equal",
+      "inv_vol"
+    ],
+    "skip_days": [
+      0,
+      1
+    ],
+    "score": [
+      "return",
+      "sharpe"
+    ]
+  },
+  "fixed": {
+    "regime": "both",
+    "regime_sma_days": 150,
+    "btc_sma_days": 100
+  },
+  "periods": [
+    "train",
+    "validation"
+  ],
+  "fee_per_side": 0.001,
+  "slippage_per_side": 0.0005,
+  "kind": "sweep"
+}

@@ -12,7 +12,7 @@ live loop trades.
 import pandas as pd
 
 from . import (m0_reversal, m1_reversal_trend, m2_xs_momentum, m3_momentum_regime, m4_momentum_longshort,
-               mc_momentum)
+               mc_momentum, mid_momentum)
 
 
 def _buy_hold(bars: dict[str, pd.DataFrame], params: dict) -> pd.DataFrame:
@@ -31,6 +31,7 @@ MODELS = {
     "m3_momentum_regime": m3_momentum_regime.targets,
     "m4_momentum_longshort": m4_momentum_longshort.targets,
     "mc_momentum": mc_momentum.targets,
+    "mid_momentum": mid_momentum.targets,
 }
 
 

@@ -41,14 +41,20 @@ def eligible_mask(mem: pd.DataFrame, idx: pd.DatetimeIndex, symbols: list[str]) 
     return out
 
 
-def load_mid_universe(exclude: list[str] | None = None) -> tuple[dict, pd.DataFrame, pd.DataFrame]:
-    """Cached (pickle next to the hourly files, rebuilt if membership changes)."""
+def load_mid_universe(exclude: list[str] | None = None,
+                      ranks: tuple[int, int] | None = None) -> tuple[dict, pd.DataFrame, pd.DataFrame]:
+    """Cached (pickle next to the hourly files, rebuilt if membership changes).
+    ranks: keep only members whose liquidity rank that month is in [lo, hi]."""
     cache = HOURLY.parent / "mid_panel.pkl"
     if cache.exists() and cache.stat().st_mtime > MEMBERSHIP.stat().st_mtime:
         bars, tradable, eligible = pd.read_pickle(cache)
     else:
         bars, tradable, eligible = _build()
         pd.to_pickle((bars, tradable, eligible), cache)
+    if ranks:
+        mem = load_membership()
+        mem = mem[(mem["rank"] >= ranks[0]) & (mem["rank"] <= ranks[1])]
+        eligible = eligible & eligible_mask(mem, eligible.index, list(bars))
     if exclude:
         keep = [s for s in bars if s not in exclude]
         bars = {s: bars[s] for s in keep}

@@ -1,0 +1,28 @@
+{
+  "id": "mid/R_MID1/hour5",
+  "universe": "mid_caps_pit",
+  "model": "mc_momentum",
+  "params": {
+    "regime": "both",
+    "regime_sma_days": 150,
+    "decision_hour": 5
+  },
+  "periods": [
+    "train",
+    "validation",
+    "test",
+    "full"
+  ],
+  "fee_per_side": 0.001,
+  "slippage_per_side": 0.0005,
+  "execution_delay_hours": 0,
+  "exclude": [],
+  "targets_from": null,
+  "max_position_per_asset": 0.2,
+  "max_portfolio_exposure": 0.7,
+  "bar": "1h",
+  "run_at": "2026-10-07T23:12:03",
+  "runtime_s": 7.6,
+  "git_commit": "0c61639",
+  "note": ""
+}

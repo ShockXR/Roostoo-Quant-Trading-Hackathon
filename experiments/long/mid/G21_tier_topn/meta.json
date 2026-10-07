@@ -1,0 +1,30 @@
+{
+  "id": "mid/G21_tier_topn",
+  "model": "mc_momentum",
+  "universe": "mid_caps_pit_21_40",
+  "grid": {
+    "top_n": [
+      2,
+      3,
+      4,
+      5
+    ],
+    "lookback_days": [
+      21,
+      28,
+      42
+    ]
+  },
+  "fixed": {
+    "regime": "both",
+    "regime_sma_days": 150,
+    "btc_sma_days": 100
+  },
+  "periods": [
+    "train",
+    "validation"
+  ],
+  "fee_per_side": 0.001,
+  "slippage_per_side": 0.0005,
+  "kind": "sweep"
+}

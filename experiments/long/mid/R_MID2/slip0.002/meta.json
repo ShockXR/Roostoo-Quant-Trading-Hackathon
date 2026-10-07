@@ -1,0 +1,24 @@
+{
+  "id": "mid/R_MID2/slip0.002",
+  "universe": "mid_caps_pit_21_40",
+  "model": "m0_reversal",
+  "params": {},
+  "periods": [
+    "train",
+    "validation",
+    "test",
+    "full"
+  ],
+  "fee_per_side": 0.001,
+  "slippage_per_side": 0.002,
+  "execution_delay_hours": 0,
+  "exclude": [],
+  "targets_from": "mid/MID2_full",
+  "max_position_per_asset": 0.2,
+  "max_portfolio_exposure": 0.7,
+  "bar": "1h",
+  "run_at": "2026-10-07T23:10:58",
+  "runtime_s": 7.0,
+  "git_commit": "0c61639",
+  "note": ""
+}

@@ -95,7 +95,8 @@ def load_universe(universe: str, exclude: list[str] | None = None) -> tuple[dict
 
 
 MID = "mid_caps_pit"
-UNIVERSE_CHOICES = [*LONG_UNIVERSES, MID]
+MID_SUBSETS = {"mid_caps_pit_21_40": (21, 40), "mid_caps_pit_41_60": (41, 60)}   # liquidity tiers
+UNIVERSE_CHOICES = [*LONG_UNIVERSES, MID, *MID_SUBSETS]
 # Mid-cap base slippage per side: half a tick is already ~5-6 bp on ARB/ENA
 # and ~2 bp on CRV (experiments/midcaps/EXPERIMENT_LOG.md); large caps 1.5 bp.
 MID_SLIPPAGE = 0.0005
@@ -103,16 +104,16 @@ MID_SLIPPAGE = 0.0005
 
 def default_slippage(universe: str) -> float:
     from roostoo import config
-    return MID_SLIPPAGE if universe == MID else config.SLIPPAGE_ESTIMATE / 2
+    return MID_SLIPPAGE if universe.startswith(MID) else config.SLIPPAGE_ESTIMATE / 2
 
 
 def load_any(universe: str, exclude: list[str] | None = None):
     """(bars, tradable, eligible, close_1m). Large caps: every listed asset is
     eligible and drawdowns are re-marked on 1m closes. Point-in-time mid caps
     (scripts/midcap_data.py): monthly membership, hourly marks only."""
-    if universe == MID:
+    if universe == MID or universe in MID_SUBSETS:
         from midcap_data import load_mid_universe
-        bars, tradable, eligible = load_mid_universe(exclude)
+        bars, tradable, eligible = load_mid_universe(exclude, MID_SUBSETS.get(universe))
         return bars, tradable, eligible, None
     bars, tradable = load_universe(universe, exclude)
     return bars, tradable, None, minute_closes(universe)[list(bars)]

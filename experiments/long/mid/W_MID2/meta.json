@@ -1,0 +1,26 @@
+{
+  "id": "mid/W_MID2",
+  "model": "mid_momentum",
+  "grid": {
+    "lookback_days": [
+      14,
+      28,
+      56
+    ],
+    "regime_sma_days": [
+      100,
+      150,
+      200
+    ],
+    "btc_sma_days": [
+      50,
+      100,
+      200
+    ]
+  },
+  "fixed": {},
+  "frozen": {},
+  "start": "2023-01-01",
+  "end": "2026-07-01",
+  "kind": "walkforward"
+}

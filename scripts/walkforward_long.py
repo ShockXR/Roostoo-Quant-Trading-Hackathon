@@ -25,7 +25,7 @@ import pandas as pd
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from common import register_package  # noqa: E402
-from run_long import LONG_DIR, load_universe, minute_closes, minute_equity  # noqa: E402
+from run_long import LONG_DIR, UNIVERSE_CHOICES, default_slippage, load_any, minute_equity  # noqa: E402
 
 
 def _sharpe(daily: pd.Series) -> float:
@@ -43,6 +43,7 @@ def main():
     ap.add_argument("--start", default="2023-01-01", help="first out-of-sample block")
     ap.add_argument("--end", default="2026-07-01")
     ap.add_argument("--step-months", type=int, default=6)
+    ap.add_argument("--universe", default="large_caps_2022", choices=UNIVERSE_CHOICES)
     args = ap.parse_args()
 
     register_package()
@@ -52,14 +53,13 @@ def main():
 
     grid = {k: json.loads(v) for k, v in (g.split("=", 1) for g in args.grid)}
     fixed = {k: json.loads(v) for k, v in (f.split("=", 1) for f in args.fixed or [])}
-    bars, tradable = load_universe("large_caps_2022")
-    close_1m = minute_closes("large_caps_2022")
+    bars, tradable, eligible, close_1m = load_any(args.universe)
     opens = pd.DataFrame({s: b["open"] for s, b in bars.items()})
     closes = pd.DataFrame({s: b["close"] for s, b in bars.items()})
-    costs = Costs(config.TAKER_FEE, config.SLIPPAGE_ESTIMATE / 2)
+    costs = Costs(config.TAKER_FEE, default_slippage(args.universe))
 
     def tgt(params):
-        t = strategies.generate(args.model, bars, params)
+        t = strategies.generate(args.model, bars, params, eligible=eligible)
         return t.reindex(columns=list(bars)).where(tradable, 0.0).fillna(0.0)
 
     def run(t):
@@ -88,8 +88,9 @@ def main():
         res = simulate(opens[span], closes[span], t[span], costs=costs,
                        max_gross_exposure=config.MAX_PORTFOLIO_EXPOSURE)
         r = report(res, bar_minutes=60)
-        e = pd.concat([pd.Series([res.initial_capital]), minute_equity(res, close_1m).reset_index(drop=True)])
-        r["max_drawdown"] = float((e / e.cummax() - 1).min())
+        if close_1m is not None:
+            e = pd.concat([pd.Series([res.initial_capital]), minute_equity(res, close_1m).reset_index(drop=True)])
+            r["max_drawdown"] = float((e / e.cummax() - 1).min())
         rows.append({"run": name, **{k: r[k] for k in ["total_return", "annualized_return", "sharpe_daily",
                                                       "sortino_daily", "max_drawdown", "n_trades"]}})
     out = LONG_DIR / args.id
