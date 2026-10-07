@@ -1,7 +1,8 @@
 """
 Regime and drawdown breakdown of one or more experiments' PORTFOLIO
 equity over the full window: daily PnL by market direction and by
-volatility tercile (of the equal-weight basket of the five assets), losing
+volatility tercile (of the equal-weight basket of the experiment's own
+assets, taken from its targets), losing
 streaks, worst rolling windows, drawdown episodes and monthly returns.
 
 Re-simulates from each experiment's cached targets.parquet with the same
@@ -10,6 +11,10 @@ costs the experiment used.
 Run from the project root:
 
     .venv/bin/python scripts/regime_report.py F01_final E01_baseline B00_buy_hold_20pct
+    .venv/bin/python scripts/regime_report.py midcaps/MF01_final midcaps/ME01_baseline \
+        midcaps/MB00_buy_hold_20pct
+
+Output: regime_report.json next to the first experiment's folder.
 """
 import json
 import pathlib
@@ -19,7 +24,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from common import EXPERIMENTS_DIR, LARGE_CAPS, load_ohlcv, register_package  # noqa: E402
+from common import EXPERIMENTS_DIR, load_ohlcv, register_package  # noqa: E402
 
 
 def _streak(flags) -> int:
@@ -36,7 +41,11 @@ def main():
     from roostoo import config
     from roostoo.backtest.simulator import Costs, simulate
 
-    ohlcv = {s: load_ohlcv(s) for s in LARGE_CAPS}
+    targets_by_id = {exp: pd.read_parquet(EXPERIMENTS_DIR / exp / "targets.parquet") for exp in ids}
+    symbols = list(targets_by_id[ids[0]].columns)
+    if any(list(t.columns) != symbols for t in targets_by_id.values()):
+        sys.exit("all experiments must trade the same assets (one universe per report)")
+    ohlcv = {s: load_ohlcv(s) for s in symbols}
     opens = pd.DataFrame({s: d["open"] for s, d in ohlcv.items()})
     closes = pd.DataFrame({s: d["close"] for s, d in ohlcv.items()})
     basket = (closes / closes.iloc[0]).mean(axis=1)
@@ -51,7 +60,7 @@ def main():
     report = {}
     for exp in ids:
         meta = json.loads((EXPERIMENTS_DIR / exp / "meta.json").read_text())
-        targets = pd.read_parquet(EXPERIMENTS_DIR / exp / "targets.parquet")
+        targets = targets_by_id[exp]
         res = simulate(opens, closes, targets, costs=Costs(meta["fee_per_side"], meta["slippage_per_side"]),
                        max_gross_exposure=config.MAX_PORTFOLIO_EXPOSURE)
         eq = res.equity
@@ -97,7 +106,7 @@ def main():
         for k, v in by.items():
             print(f"  -- by basket {k}\n" + v.to_string().replace("\n", "\n  "))
 
-    out = EXPERIMENTS_DIR / "regime_report.json"
+    out = (EXPERIMENTS_DIR / ids[0]).parent / "regime_report.json"
     out.write_text(json.dumps(report, indent=2))
     print(f"\nsaved -> {out.relative_to(EXPERIMENTS_DIR.parent)}")
 

@@ -20,7 +20,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from common import EXPERIMENTS_DIR, LARGE_CAPS, load_ohlcv  # noqa: E402
+from common import EXPERIMENTS_DIR, load_ohlcv  # noqa: E402
 
 TREND_BARS = 24 * 60     # 1-day trend: close vs its 1440-bar mean at entry
 VOL_BARS = 24 * 60       # 1-day realized vol of 1m returns at entry
@@ -47,7 +47,7 @@ def main():
     trades = pd.read_csv(exp / f"trades_{args.period}.csv", parse_dates=["entry_time", "exit_time"])
     if trades.empty:
         sys.exit("no trades")
-    closes = {s: load_ohlcv(s)["close"] for s in LARGE_CAPS}
+    closes = {s: load_ohlcv(s)["close"] for s in trades["symbol"].unique()}
 
     rows = []
     paths = []

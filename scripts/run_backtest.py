@@ -21,6 +21,9 @@ Run from the project root:
         --periods train validation test full
     # one parameter changed, train + validation only (the default)
     .venv/bin/python scripts/run_backtest.py --id X --strategy reversal --param k=1.75
+    # mid caps (results kept apart under experiments/midcaps/)
+    .venv/bin/python scripts/run_backtest.py --id midcaps/MF01_final --universe mid_caps \
+        --periods train validation test full
     # stress test: re-simulate cached targets with higher costs
     .venv/bin/python scripts/run_backtest.py --id S --targets-from F01_final --fee 0.002 \
         --periods train validation test full
@@ -38,7 +41,8 @@ import pandas as pd
 from sklearn.exceptions import ConvergenceWarning
 
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent))
-from common import EXPERIMENTS_DIR, LARGE_CAPS, PERIODS, load_ohlcv, period_slice, register_package, to_pair  # noqa: E402
+from common import (EXPERIMENTS_DIR, LARGE_CAPS, PERIODS, UNIVERSES, load_ohlcv,  # noqa: E402
+                    period_slice, register_package, to_pair)
 
 warnings.filterwarnings("ignore", category=ConvergenceWarning)
 
@@ -56,18 +60,30 @@ def _parse_params(items: list[str]) -> dict:
     return out
 
 
+def context_raw(symbol: str, closes: dict) -> dict:
+    """Price history the ML features of `symbol` are built from: the five
+    majors plus the symbol itself, as scripts/backtest_sol.py does (its
+    CONTEXT_SYMBOLS). BTC is config.MARKET_PROXY. For a large cap this is
+    exactly the five large caps."""
+    symbols = LARGE_CAPS + ([symbol] if symbol not in LARGE_CAPS else [])
+    return {to_pair(s): closes[s].rename("last_price").rename_axis("timestamp").reset_index()
+            for s in symbols}
+
+
 def _signal_worker(symbol: str) -> tuple[str, pd.Series]:
     from roostoo import strategy
-    raw, panel, ohlcv, name, params = (_STATE[k] for k in ("raw", "panel", "ohlcv", "strategy", "params"))
-    target = strategy.generate_targets(name, to_pair(symbol), raw, panel, ohlcv[symbol], params)
+    from roostoo.features.build_features import build_price_panel
+    closes, ohlcv, name, params = (_STATE[k] for k in ("closes", "ohlcv", "strategy", "params"))
+    raw = context_raw(symbol, closes)
+    target = strategy.generate_targets(name, to_pair(symbol), raw, build_price_panel(raw),
+                                       ohlcv[symbol], params)
     return symbol, target.reindex(ohlcv[symbol].index).fillna(0.0)
 
 
 def build_targets(name: str, params: dict, ohlcv: dict, jobs: int) -> pd.DataFrame:
-    from roostoo.features.build_features import build_price_panel
-    raw = {to_pair(s): df["close"].rename("last_price").rename_axis("timestamp").reset_index()
-           for s, df in ohlcv.items()}
-    _STATE.update(raw=raw, panel=build_price_panel(raw), ohlcv=ohlcv, strategy=name, params=params)
+    closes = {s: load_ohlcv(s)["close"] for s in LARGE_CAPS if s not in ohlcv}
+    closes.update({s: df["close"] for s, df in ohlcv.items()})
+    _STATE.update(closes=closes, ohlcv=ohlcv, strategy=name, params=params)
     if jobs <= 1:
         results = dict(map(_signal_worker, list(ohlcv)))
     else:
@@ -112,6 +128,8 @@ def evaluate(targets: pd.DataFrame, ohlcv: dict, fee: float, slippage: float,
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--id", required=True, help="experiment id, also the output folder name")
+    ap.add_argument("--universe", default="large_caps", choices=UNIVERSES,
+                    help="assets to trade (scripts/common.UNIVERSES)")
     ap.add_argument("--strategy", default="reversal", help="see strategy.STRATEGIES")
     ap.add_argument("--param", action="append", help="key=value (JSON value), repeatable")
     ap.add_argument("--periods", nargs="+", default=["train", "validation"], choices=PERIODS,
@@ -140,7 +158,7 @@ def main():
 
     out = EXPERIMENTS_DIR / args.id
     out.mkdir(parents=True, exist_ok=True)
-    ohlcv = {s: load_ohlcv(s) for s in LARGE_CAPS}
+    ohlcv = {s: load_ohlcv(s) for s in UNIVERSES[args.universe]}
 
     cache_dir = EXPERIMENTS_DIR / (args.targets_from or args.id)
     cache = cache_dir / "targets.parquet"
@@ -163,7 +181,7 @@ def main():
 
     commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
     meta = {
-        "id": args.id, "strategy": args.strategy, "params": params, "periods": args.periods,
+        "id": args.id, "universe": args.universe, "strategy": args.strategy, "params": params, "periods": args.periods,
         "fee_per_side": fee, "slippage_per_side": slippage,
         "initial_capital": args.capital, "execution_delay_bars": args.delay,
         "max_position_per_asset": config.MAX_POSITION_PER_ASSET,

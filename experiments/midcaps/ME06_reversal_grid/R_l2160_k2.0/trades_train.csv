@@ -1,0 +1,2 @@
+symbol,entry_time,exit_time,bars,pnl,return_on_equity,costs,max_weight,side,open_at_end
+AAVEUSDT,2026-07-17 00:00:00+00:00,2026-07-18 15:00:00+00:00,2340,-541.7326973684226,-0.005417326973684225,59.27655701754386,0.2,long,False

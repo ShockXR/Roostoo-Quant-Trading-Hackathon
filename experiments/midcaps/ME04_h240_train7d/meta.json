@@ -1,0 +1,29 @@
+{
+  "id": "midcaps/ME04_h240_train7d",
+  "universe": "mid_caps",
+  "strategy": "baseline",
+  "params": {
+    "horizon": 240,
+    "config": {
+      "WALKFORWARD_TRAIN_BARS": 10080,
+      "WALKFORWARD_VAL_BARS": 1440,
+      "WALKFORWARD_STEP_BARS": 1440
+    }
+  },
+  "periods": [
+    "train",
+    "validation"
+  ],
+  "fee_per_side": 0.001,
+  "slippage_per_side": 0.0005,
+  "initial_capital": 100000.0,
+  "execution_delay_bars": 0,
+  "max_position_per_asset": 0.2,
+  "max_portfolio_exposure": 0.7,
+  "target_horizon": 240,
+  "targets_from": null,
+  "run_at": "2026-10-06T03:26:39",
+  "runtime_s": 39038.6,
+  "git_commit": "d68ec11",
+  "note": "Mid-cap rerun of E04: h240 + 7-day walk-forward train window"
+}

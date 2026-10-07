@@ -13,6 +13,8 @@ DATA_DIR = ROOT / "binance_data" / "processed" / "parquet"
 EXPERIMENTS_DIR = ROOT / "experiments"
 
 LARGE_CAPS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]
+MID_CAPS = ["UNIUSDT", "AAVEUSDT", "CRVUSDT", "ARBUSDT", "ENAUSDT"]
+UNIVERSES = {"large_caps": LARGE_CAPS, "mid_caps": MID_CAPS}
 
 # Chronological split, fixed before any experiment was run. Strategy
 # changes are chosen on TRAIN and confirmed on VALIDATION; TEST is only

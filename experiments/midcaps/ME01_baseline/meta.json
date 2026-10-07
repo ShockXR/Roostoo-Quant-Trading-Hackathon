@@ -1,0 +1,24 @@
+{
+  "id": "midcaps/ME01_baseline",
+  "universe": "mid_caps",
+  "strategy": "baseline",
+  "params": {},
+  "periods": [
+    "train",
+    "validation",
+    "test",
+    "full"
+  ],
+  "fee_per_side": 0.001,
+  "slippage_per_side": 0.0005,
+  "initial_capital": 100000.0,
+  "execution_delay_bars": 0,
+  "max_position_per_asset": 0.2,
+  "max_portfolio_exposure": 0.7,
+  "target_horizon": 10,
+  "targets_from": null,
+  "run_at": "2026-10-06T02:55:05",
+  "runtime_s": 1879.5,
+  "git_commit": "d68ec11",
+  "note": "Original bot unchanged (1m, TARGET_HORIZON=10, RF + cost filter + sizing); features from majors + symbol as in backtest_sol.py. Mid-cap base slippage 0.05%/side."
+}

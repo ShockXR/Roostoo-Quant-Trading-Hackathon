@@ -1,0 +1,27 @@
+{
+  "id": "midcaps/ME08_stop/stop1.5",
+  "universe": "mid_caps",
+  "strategy": "reversal",
+  "params": {
+    "lookback": 1440,
+    "k": 1.5,
+    "hold": 1440,
+    "stop": 1.5
+  },
+  "periods": [
+    "train",
+    "validation"
+  ],
+  "fee_per_side": 0.001,
+  "slippage_per_side": 0.0005,
+  "initial_capital": 100000.0,
+  "execution_delay_bars": 0,
+  "max_position_per_asset": 0.2,
+  "max_portfolio_exposure": 0.7,
+  "target_horizon": 10,
+  "targets_from": null,
+  "run_at": "2026-10-06T03:05:58",
+  "runtime_s": 30.4,
+  "git_commit": "d68ec11",
+  "note": "mid-cap rerun of large-cap experiment family - archived experimental strategy code"
+}

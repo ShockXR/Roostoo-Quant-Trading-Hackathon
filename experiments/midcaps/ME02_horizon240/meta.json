@@ -1,0 +1,24 @@
+{
+  "id": "midcaps/ME02_horizon240",
+  "universe": "mid_caps",
+  "strategy": "baseline",
+  "params": {
+    "horizon": 240
+  },
+  "periods": [
+    "train",
+    "validation"
+  ],
+  "fee_per_side": 0.001,
+  "slippage_per_side": 0.0005,
+  "initial_capital": 100000.0,
+  "execution_delay_bars": 0,
+  "max_position_per_asset": 0.2,
+  "max_portfolio_exposure": 0.7,
+  "target_horizon": 240,
+  "targets_from": null,
+  "run_at": "2026-10-06T03:08:38",
+  "runtime_s": 2068.8,
+  "git_commit": "d68ec11",
+  "note": "Mid-cap rerun of E02: TARGET_HORIZON 10->240"
+}

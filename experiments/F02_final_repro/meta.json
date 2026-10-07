@@ -1,5 +1,6 @@
 {
   "id": "F02_final_repro",
+  "universe": "large_caps",
   "strategy": "reversal",
   "params": {},
   "periods": [
@@ -16,8 +17,8 @@
   "max_portfolio_exposure": 0.7,
   "target_horizon": 10,
   "targets_from": null,
-  "run_at": "2026-10-06T01:04:42",
-  "runtime_s": 27.1,
-  "git_commit": "87ad83f",
+  "run_at": "2026-10-06T02:51:52",
+  "runtime_s": 25.4,
+  "git_commit": "d68ec11",
   "note": "Reproducibility check: final strategy from config defaults after code cleanup; must match F01_final"
 }

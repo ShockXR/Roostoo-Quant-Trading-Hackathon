@@ -1,0 +1,25 @@
+{
+  "id": "midcaps/ME06_reversal_grid/R_l240_k1.75",
+  "universe": "mid_caps",
+  "strategy": "reversal",
+  "params": {
+    "lookback": 240,
+    "k": 1.75,
+    "hold": 240
+  },
+  "periods": [
+    "train"
+  ],
+  "fee_per_side": 0.001,
+  "slippage_per_side": 0.0005,
+  "initial_capital": 100000.0,
+  "execution_delay_bars": 0,
+  "max_position_per_asset": 0.2,
+  "max_portfolio_exposure": 0.7,
+  "target_horizon": 10,
+  "targets_from": null,
+  "run_at": "2026-10-06T02:57:34",
+  "runtime_s": 19.1,
+  "git_commit": "d68ec11",
+  "note": "ME06 reversal grid, train only"
+}

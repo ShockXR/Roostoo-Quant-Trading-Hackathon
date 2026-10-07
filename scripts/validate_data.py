@@ -5,19 +5,24 @@ what to do about it.
 
 Run from the project root:
 
-    .venv/bin/python scripts/validate_data.py
+    .venv/bin/python scripts/validate_data.py                       # large caps
+    .venv/bin/python scripts/validate_data.py --universe mid_caps
 """
+import argparse
 import json
 import pathlib
+import sys
 
 import numpy as np
 import pandas as pd
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "binance_data" / "processed" / "parquet"
-OUT = ROOT / "experiments" / "data_validation.json"
+sys.path.insert(0, str(ROOT / "scripts"))
+from common import UNIVERSES  # noqa: E402
 
-LARGE_CAPS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]
+OUT = {"large_caps": ROOT / "experiments" / "data_validation.json",
+       "mid_caps": ROOT / "experiments" / "midcaps" / "data_validation.json"}
 OHLCV = ["open", "high", "low", "close", "volume"]
 
 
@@ -69,15 +74,19 @@ def audit(symbol: str) -> dict:
 
 
 def main():
-    rows = [audit(s) for s in LARGE_CAPS]
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps(rows, indent=2))
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--universe", default="large_caps", choices=UNIVERSES)
+    args = ap.parse_args()
+    out = OUT[args.universe]
+    rows = [audit(s) for s in UNIVERSES[args.universe]]
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(rows, indent=2))
     table = pd.DataFrame(rows).set_index("symbol").drop(columns=["monthly_returns"])
     with pd.option_context("display.width", 250, "display.max_columns", None):
         print(table.T.to_string())
         print("\nmonthly close-to-close returns:")
         print(pd.DataFrame({r["symbol"]: r["monthly_returns"] for r in rows}).round(4).to_string())
-    print(f"\nsaved -> {OUT.relative_to(ROOT)}")
+    print(f"\nsaved -> {out.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":
