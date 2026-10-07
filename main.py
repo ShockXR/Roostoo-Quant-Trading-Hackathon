@@ -85,11 +85,21 @@ def _load_state(path: pathlib.Path) -> dict:
     return json.loads(path.read_text()) if path.exists() else {}
 
 
+def log_decision(record: dict, path: str | None = None):
+    """Append one JSON line to the decision log (scripts/reconcile_live.py reads it)."""
+    path = pathlib.Path(path or config.LIVE_DECISION_LOG)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a") as f:
+        f.write(json.dumps({"logged_at": pd.Timestamp.now(tz="UTC").isoformat(), "dry_run": DRY_RUN, **record},
+                           default=str) + "\n")
+
+
 def run_once(broker, state: dict, pair_info: dict, now_ms: int | None = None) -> dict:
     bar_time, targets = latest_targets(now_ms)
     expected = pd.Timestamp(now_ms or time.time() * 1000, unit="ms", tz="UTC").floor("1h") - pd.Timedelta("1h")
     if bar_time < expected:
         log.warning("latest bar %s is stale (expected %s); not trading this hour", bar_time, expected)
+        log_decision({"status": "stale", "bar": bar_time, "expected_bar": expected})
         return state
     targets = rebalance.cap_gross(targets)
     prices = _prices()
@@ -110,16 +120,22 @@ def run_once(broker, state: dict, pair_info: dict, now_ms: int | None = None) ->
     orders = rebalance.plan_orders(targets, holdings, prices, pair_info, state.get("targets"))
     done = dict(state.get("targets") or {})
     failed = set()
+    sent = []
     for o in orders:
         log.info("%s%s %s %s (~$%.2f)", "[DRY RUN] " if DRY_RUN else "", o.side, o.quantity, o.pair, o.notional)
-        if not broker.place(o, prices[o.pair]):
+        ok = broker.place(o, prices[o.pair])
+        if not ok:
             failed.add(o.pair)
+        sent.append({"pair": o.pair, "side": o.side, "quantity": o.quantity, "notional": o.notional, "ok": ok})
     # remember a target only once it is acted on, so a failed order is retried next hour
     for p, w in targets.items():
         if p not in failed:
             done[p] = w
     held = {p: round(w, 4) for p, w in targets.items() if w > 0}
     log.info("bar %s equity %.2f targets %s orders %d", bar_time, equity, held or "cash", len(orders))
+    log_decision({"status": "ok", "bar": bar_time, "model": config.PRODUCTION_MODEL, "targets": targets,
+                  "prices": prices, "holdings_before": holdings, "equity": equity, "halted": halted,
+                  "orders": sent})
     return {"targets": done, "peak_equity": peak, "halted": halted, "last_bar": str(bar_time),
             "equity": equity, "paper_holdings": broker.balance() if DRY_RUN else None}
 
@@ -142,8 +158,9 @@ def run_forever():
         try:
             state = run_once(broker, state, pair_info)
             path.write_text(json.dumps(state, indent=2))
-        except Exception:
+        except Exception as e:
             log.exception("error in live loop; retrying next hour")
+            log_decision({"status": "error", "error": repr(e)})
         now = time.time()
         time.sleep(3600 - now % 3600 + 30)   # 30 s after the next hour closes
 

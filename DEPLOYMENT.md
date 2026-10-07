@@ -111,6 +111,17 @@ hour. It paper-trades by default; add `ROOSTOO_LIVE=1` to `.env` to send real
 orders. `scripts/run_live.py --once` prints one decision and exits — run it
 first to check data access, prices and order sizes.
 
+Checklist before `ROOSTOO_LIVE=1`:
+
+1. `.venv/bin/python scripts/check_account.py` — read-only: keys work, the
+   balance layout parses, account value at Roostoo prices. No orders.
+2. `.venv/bin/python scripts/test_min_order.py` — places tiny orders on the
+   mock exchange to settle whether `MiniOrder` is $ notional or units.
+3. Paper-trade for 2–3 days (default). Every hour is appended to
+   `data_store/live_decisions.jsonl`; then run
+   `.venv/bin/python scripts/reconcile_live.py`. It should report every hour
+   matching the backtest code path, no missing hours, and small price gaps.
+
 1. **Run with `DRY_RUN = True` first** (default in `main.py`) for at least a
    few hours after deployment — watch `logs/bot.log` and confirm the
    decisions it *would* make look sane before flipping it to live orders.

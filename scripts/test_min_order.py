@@ -3,19 +3,23 @@ Determines whether "Minimum order size: 1" means $1 notional (price * qty)
 or 1 whole unit of the coin, by reading ExchangeInfo and attempting a few
 deliberately tiny orders and reading back the exact ErrMsg.
 
-Run with real API_KEY/SECRET set (env vars RST_API_KEY / RST_API_SECRET,
-or edit config.py directly), from the project root:
+Run with ROOSTOO_API_KEY / ROOSTOO_API_SECRET set (environment or .env),
+from the project root:
 
-    python -m roostoo_bot.scripts.test_min_order
+    .venv/bin/python scripts/test_min_order.py
 
 Safe to run against the mock exchange -- it's not real money, and every
 attempt is logged with the raw response so you can see exactly what the
 server says either way.
 """
+import pathlib
 import sys
 
-from .. import config
-from ..execution.trader import get_exchange_info, get_ticker, place_order, cancel_order
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from common import register_package  # noqa: E402
+
+register_package()
+from roostoo.execution.trader import cancel_order, get_exchange_info, get_ticker, place_order  # noqa: E402
 
 # Pick one cheap, high-unit-price coin and one expensive, low-unit-price
 # coin -- if the rule were "1 whole unit", these two would behave very

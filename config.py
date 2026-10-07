@@ -174,6 +174,7 @@ PRODUCTION_SYMBOLS = {
 BINANCE_KLINES_URL = "https://data-api.binance.vision/api/v3/klines"   # public, no key
 LIVE_HISTORY_DAYS = 130            # >= 100-day SMA + 28-day lookback, with margin
 LIVE_STATE_FILE = "data_store/live_state.json"
+LIVE_DECISION_LOG = "data_store/live_decisions.jsonl"   # one JSON line per hour; scripts/reconcile_live.py
 LIVE_RECONCILE_TOLERANCE = 0.02    # on a fresh start, fix positions > 2% of equity off target
 # Drawdown stop for the live loop (fraction from peak equity; None = off).
 # Off by default: on Model 3's 2022-2026 history a 12% stop fired in 7.6% of

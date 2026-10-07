@@ -6,8 +6,10 @@ Run from the project root:
 
     .venv/bin/python -m unittest discover -s tests -v
 """
+import json
 import pathlib
 import sys
+import tempfile
 import unittest
 from unittest import mock
 
@@ -88,11 +90,34 @@ class FakeBroker(live.PaperBroker):
 
 
 class RunOnceTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.log = pathlib.Path(self.tmp.name) / "decisions.jsonl"
+        patcher = mock.patch.object(config, "LIVE_DECISION_LOG", str(self.log))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.addCleanup(self.tmp.cleanup)
+
     def run_once(self, broker, state, targets, bar="2026-10-01 10:00"):
         now = int(pd.Timestamp("2026-10-01 11:00:30", tz="UTC").timestamp() * 1000)
         with mock.patch.object(live, "latest_targets", return_value=(pd.Timestamp(bar, tz="UTC"), targets)), \
              mock.patch.object(live, "_prices", return_value=PRICES):
             return live.run_once(broker, state, INFO, now_ms=now)
+
+    def records(self):
+        return [json.loads(line) for line in self.log.read_text().splitlines()]
+
+    def test_every_hour_is_logged(self):
+        b = FakeBroker(50_000.0, fail={"ETH/USD"})
+        self.run_once(b, {}, {"BTC/USD": 0.2, "ETH/USD": 0.2, "DOGE/USD": 0.0})
+        self.run_once(b, {}, {"BTC/USD": 0.2, "ETH/USD": 0.0, "DOGE/USD": 0.0}, bar="2026-10-01 07:00")
+        ok, stale = self.records()
+        self.assertEqual(ok["status"], "ok")
+        self.assertEqual(ok["bar"], "2026-10-01 10:00:00+00:00")
+        self.assertEqual(ok["targets"]["BTC/USD"], 0.2)
+        self.assertEqual(ok["holdings_before"], {"USD": 50_000.0})
+        self.assertEqual({(o["pair"], o["ok"]) for o in ok["orders"]}, {("BTC/USD", True), ("ETH/USD", False)})
+        self.assertEqual(stale["status"], "stale")
 
     def test_trades_new_targets_and_remembers_them(self):
         b = FakeBroker(50_000.0)
