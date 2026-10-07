@@ -82,7 +82,9 @@ def adopt_wallet_holdings(raw_data: dict[str, pd.DataFrame]):
             if coin == "USD":
                 continue
             pair = f"{coin}/USD"
-            total_qty = float(info.get("Free", 0.0)) + float(info.get("Frozen", 0.0))
+            free_q = float(info.get("Free", 0.0) or info.get("free", 0.0))
+            froz_q = float(info.get("Frozen", 0.0) or info.get("frozen", 0.0))
+            total_qty = free_q + froz_q
             if total_qty <= 0:
                 continue
 
@@ -97,10 +99,13 @@ def adopt_wallet_holdings(raw_data: dict[str, pd.DataFrame]):
                 else:
                     vol_24h = 0.001
 
-                vol_dist = latest_p * vol_24h * np.sqrt(1440)
-                stop_p = latest_p - (2.0 * vol_dist)
-                tp_p = latest_p + (1.5 * vol_dist)
                 sleeve = "largecap" if pair in getattr(config, "LARGECAP_UNIVERSE", []) else "midcap"
+                sl_k = getattr(config, "STOP_LOSS_K", 3.0) if sleeve == "largecap" else getattr(config, "MIDCAP_STOP_LOSS_K", 3.5)
+                tp_k = getattr(config, "TAKE_PROFIT_K", 1.5) if sleeve == "largecap" else getattr(config, "MIDCAP_TAKE_PROFIT_K", 2.0)
+
+                vol_dist = latest_p * vol_24h * np.sqrt(1440)
+                stop_p = latest_p - (sl_k * vol_dist)
+                tp_p = latest_p + (tp_k * vol_dist)
 
                 ACTIVE_POSITIONS[pair] = {
                     "entry_time": time.time(),
