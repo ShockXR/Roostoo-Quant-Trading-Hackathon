@@ -138,6 +138,10 @@ SLOW_MIDCAP_EXPIRY_HOURS = 12        # 12 Hours recovery window for slower conso
 FAST_MIDCAP_EXPIRY_HOURS = 4         # 4 Hours recovery window for fast-recovering mid-caps
 MIDCAP_RANK_UPDATE_INTERVAL_MINUTES = 60 # Hourly mid-cap momentum rank updates (filters 1m micro-noise while allowing 24/7 intraday trade recycling)
 POST_STOP_LOSS_COOLDOWN_HOURS = 2    # 2 Hours post-stop-loss cool-down lockout before re-entry
+
+# --- Price-Separation Re-Entry Guards ---
+LARGECAP_REENTRY_SEPARATION_PCT = 0.0100  # Requires 1.0% price distance from last exit price for Large-Caps
+MIDCAP_REENTRY_SEPARATION_PCT = 0.0200    # Requires 2.0% price distance from last exit price for Mid-Caps
 # --- Separate Dynamic Trailing Profit Ratchets ---
 # Large-Cap Ratchet (Precision Tighter Locking for Lower-Volatility Majors)
 LARGECAP_TRAILING_RATCHETS = [

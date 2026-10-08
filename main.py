@@ -190,6 +190,7 @@ def process_largecap_sleeve(raw_data: dict[str, pd.DataFrame]):
                     place_order(pair, "SELL", quantity=quantity)
                 del ACTIVE_POSITIONS[pair]
                 save_active_positions()
+                record_last_exit_price(pair, latest_price)
                 continue
 
             # Dynamic Trailing Profit Ratchet Check for Large-Caps
@@ -212,6 +213,7 @@ def process_largecap_sleeve(raw_data: dict[str, pd.DataFrame]):
                     place_order(pair, "SELL", quantity=quantity)
                 del ACTIVE_POSITIONS[pair]
                 save_active_positions()
+                record_last_exit_price(pair, latest_price)
                 continue
 
             # Rule 2: Take-Profit Target Exit
@@ -224,10 +226,20 @@ def process_largecap_sleeve(raw_data: dict[str, pd.DataFrame]):
                     place_order(pair, "SELL", quantity=quantity)
                 del ACTIVE_POSITIONS[pair]
                 save_active_positions()
+                record_last_exit_price(pair, latest_price)
                 continue
 
             else:
                 log.info("[LARGECAP] %s: Position active (Holding: %dm, Price: $%.4f, Stop: $%.4f, TP: $%.4f)", pair, int(time_elapsed // 60), latest_price, stop_price, tp_price)
+                continue
+
+        # Check Price-Separation Re-Entry Guard (Requires 1.0% distance from last exit price)
+        last_exit_p = load_last_exit_prices().get(pair, 0.0)
+        if last_exit_p > 0.0:
+            price_diff_pct = abs(latest_price - last_exit_p) / last_exit_p
+            req_diff = getattr(config, "LARGECAP_REENTRY_SEPARATION_PCT", 0.0100)
+            if price_diff_pct < req_diff:
+                log.info("⏳ [LARGECAP PRICE GUARD] %s: Current price $%.4f is within %.1f%% of last exit $%.4f (Diff: %.2f%%). Skipping re-entry.", pair, latest_price, req_diff * 100.0, last_exit_p, price_diff_pct * 100.0)
                 continue
 
         # Evaluate Strategy Entry Signal
@@ -295,6 +307,31 @@ def process_largecap_sleeve(raw_data: dict[str, pd.DataFrame]):
             place_order(pair, "BUY", quantity=coin_quantity)
         else:
             log.info("📝 [LARGECAP DRY RUN] Simulated BUY for %s: $%.2f USD (%.4f coins @ $%.2f)", pair, target_usd_cost, coin_quantity, latest_price)
+
+
+LAST_EXIT_FILE = os.path.join(getattr(config, "STORE_DIR", "data_store"), "last_exit_prices.json")
+
+
+def load_last_exit_prices() -> dict:
+    if os.path.exists(LAST_EXIT_FILE):
+        try:
+            with open(LAST_EXIT_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def record_last_exit_price(pair: str, price: float):
+    exits = load_last_exit_prices()
+    exits[pair] = price
+    try:
+        os.makedirs(os.path.dirname(LAST_EXIT_FILE), exist_ok=True)
+        with open(LAST_EXIT_FILE, "w") as f:
+            json.dump(exits, f, indent=2)
+        log.info("💾 [LAST EXIT PRICE RECORDED] %s: Recorded last exit price $%.4f", pair, price)
+    except Exception as e:
+        log.error("Failed to save last exit price file: %s", e)
 
 
 COOLDOWN_FILE = os.path.join(getattr(config, "STORE_DIR", "data_store"), "cooldowns.json")
@@ -386,6 +423,7 @@ def process_midcap_sleeve(raw_data: dict[str, pd.DataFrame]):
                         place_order(pair, "SELL", quantity=quantity)
                     del ACTIVE_POSITIONS[pair]
                     save_active_positions()
+                    record_last_exit_price(pair, latest_price)
                     record_cooldown(pair, hours=getattr(config, "POST_STOP_LOSS_COOLDOWN_HOURS", 2.0))
                     continue
 
@@ -409,6 +447,7 @@ def process_midcap_sleeve(raw_data: dict[str, pd.DataFrame]):
                         place_order(pair, "SELL", quantity=quantity)
                     del ACTIVE_POSITIONS[pair]
                     save_active_positions()
+                    record_last_exit_price(pair, latest_price)
                     continue
 
                 # Rule 2: Mid-Cap Fee-Protected Take Profit
@@ -420,6 +459,7 @@ def process_midcap_sleeve(raw_data: dict[str, pd.DataFrame]):
                         place_order(pair, "SELL", quantity=quantity)
                     del ACTIVE_POSITIONS[pair]
                     save_active_positions()
+                    record_last_exit_price(pair, latest_price)
                     continue
 
                 # Rule 3: Profit-Gated Rank Rotation (Rank-out + Net Profit >= +0.30%)
@@ -429,6 +469,7 @@ def process_midcap_sleeve(raw_data: dict[str, pd.DataFrame]):
                         place_order(pair, "SELL", quantity=quantity)
                     del ACTIVE_POSITIONS[pair]
                     save_active_positions()
+                    record_last_exit_price(pair, latest_price)
                     continue
 
                 log.info("[MIDCAP] %s: Position active (In Top Rank: %s, Holding: %dm, Price: $%.4f, Stop: $%.4f, TP: $%.4f)", pair, is_in_top_rank, int(time_elapsed // 60), latest_price, stop_price, tp_price)
@@ -437,6 +478,15 @@ def process_midcap_sleeve(raw_data: dict[str, pd.DataFrame]):
         # Strategy Entry Signal: Only buy if pair is in top_leaders
         if pair not in top_leaders:
             continue
+
+        # Check Price-Separation Re-Entry Guard (Requires 2.0% distance from last exit price)
+        last_exit_p = load_last_exit_prices().get(pair, 0.0)
+        if last_exit_p > 0.0:
+            price_diff_pct = abs(latest_price - last_exit_p) / last_exit_p
+            req_diff = getattr(config, "MIDCAP_REENTRY_SEPARATION_PCT", 0.0200)
+            if price_diff_pct < req_diff:
+                log.info("⏳ [MIDCAP PRICE GUARD] %s: Current price $%.4f is within %.1f%% of last exit $%.4f (Diff: %.2f%%). Skipping re-entry.", pair, latest_price, req_diff * 100.0, last_exit_p, price_diff_pct * 100.0)
+                continue
 
         # Check Post-Exit Cool-Down Lockout
         in_cd, rem_m = is_in_cooldown(pair)
