@@ -1,18 +1,10 @@
 """
-10-Day High-Velocity Alpha Model ($S_alpha$) with Dynamic Target % & Adaptive Ratchets.
+10-Day High-Frequency Backtest Engine Comparison:
+- Option A: 1-Minute Micro-Dip Scalper Engine
+- Option B: 3-Minute Dual Breakout Engine
 
-Evaluates last 10 days of 1-minute bars (14,400 1m bars per coin) ending yesterday.
-
-Dynamic Features:
-- Expected Target %: R_target = |S_alpha| * Vol_60m * sqrt(15)
-- Adaptive Ratchet 1: Peak >= 50% R_target -> Lock 30% R_target profit floor
-- Adaptive Ratchet 2: Peak >= 80% R_target -> Lock 60% R_target profit floor
-- Adaptive Stop-Loss: Ret <= -1.0 * R_target (Long) / +1.0 * R_target (Short)
-
-Position Allocation:
-- LONG: $8,000 USD (Large-Cap) / $5,000 USD (Mid-Cap)
-- SHORT: Strict $1,000 USD allocation cap per short trade
-- Price-Separation Re-Entry Guards: 1.0% Large-Cap / 2.0% Mid-Cap distance required from last exit
+Evaluates the last 10 days of price data (ending yesterday) across all 15 target coins.
+Generates a side-by-side comparative markdown report: ALPHA_MODEL_3MONTH_BACKTEST_REPORT.md
 """
 import os
 import sys
@@ -32,7 +24,7 @@ ALL_COINS = LARGECAP_COINS + MIDCAP_COINS
 DATA_DIRS = ["data_store", "data_store/processed", "binance_data", "binance_data/processed"]
 
 def load_coin_data(symbol: str) -> pd.DataFrame:
-    """Finds and loads parquet or csv files for a given symbol, filtering to last 10 days of 1m bars."""
+    """Finds and loads raw 1m data for a given symbol, filtering to last 10 days (14,400 bars)."""
     safe_symbol = symbol.replace("/", "_")  # NEAR_USD
     raw_symbol = symbol.replace("/USD", "USDT")  # NEARUSDT
     
@@ -96,285 +88,280 @@ def load_coin_data(symbol: str) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def compute_alpha_score(df: pd.DataFrame) -> tuple[pd.Series, pd.Series, pd.Series]:
-    """
-    Computes S_alpha = 0.35*VolImbalance + 0.35*RelStrength + 0.20*MomSlope + 0.10*TrendAlignment
-    Calculates 15m Micro-Squeeze Gate (BB Bandwidth <= 1.20%) and Rolling 60m Volatility.
-    """
-    close = df["close"]
-    volume = df["volume"]
-    open_p = df["open"]
-    high_p = df["high"]
-    low_p = df["low"]
+# ==============================================================================
+# OPTION A: 1-MINUTE MICRO-DIP SCALPER ENGINE
+# ==============================================================================
+def run_option_a_scalper(symbol: str, df: pd.DataFrame) -> dict:
+    if df.empty or len(df) < 30:
+        return {"symbol": symbol, "trades": 0, "win_rate": 0.0, "net_profit": 0.0, "pf": 0.0, "trades_per_day": 0.0}
+        
+    close = df["close"].values
+    high = df["high"].values
+    low = df["low"].values
     
-    if len(close) < 30:
-        return pd.Series(0.0, index=close.index), pd.Series(False, index=close.index), pd.Series(0.002, index=close.index)
+    # Calculate 14-bar RSI
+    delta = df["close"].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(14, min_periods=5).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(14, min_periods=5).mean()
+    rs = gain / loss.replace(0, np.nan).fillna(0.001)
+    rsi = (100 - (100 / (1 + rs))).fillna(50.0).values
+    
+    # Calculate Z-score of 20-bar return
+    ret_20 = df["close"].pct_change(20)
+    vol_60 = df["close"].pct_change().rolling(60, min_periods=10).std().replace(0, np.nan).fillna(0.002)
+    z_score = (ret_20 / (vol_60 * np.sqrt(20))).fillna(0.0).values
+    
+    is_largecap = symbol in LARGECAP_COINS
+    long_alloc = 8000.0 if is_largecap else 5000.0
+    short_alloc = 1000.0  # Capped at $1k
+    reentry_sep = 0.0050  # 0.5% separation
+    
+    position = None
+    entry_price = 0.0
+    last_exit_price = 0.0
+    trades = []
+    
+    for i in range(20, len(close)):
+        p = close[i]
+        c_rsi = rsi[i]
+        c_z = z_score[i]
+        
+        # 1. Manage Active Position
+        if position == "LONG":
+            ret = (p - entry_price) / entry_price
+            if ret >= 0.0070:  # Take profit +0.70% (+0.50% net)
+                pnl = (p - entry_price) * (long_alloc / entry_price) - (long_alloc * 0.002)
+                trades.append({"pnl": pnl, "win": pnl > 0, "side": "LONG"})
+                position = None
+                last_exit_price = p
+            elif ret <= -0.0150:  # Stop loss -1.50%
+                pnl = (p - entry_price) * (long_alloc / entry_price) - (long_alloc * 0.002)
+                trades.append({"pnl": pnl, "win": pnl > 0, "side": "LONG"})
+                position = None
+                last_exit_price = p
+                
+        elif position == "SHORT":
+            ret = (entry_price - p) / entry_price
+            if ret >= 0.0070:  # Take profit +0.70%
+                pnl = (entry_price - p) * (short_alloc / entry_price) - (short_alloc * 0.002)
+                trades.append({"pnl": pnl, "win": pnl > 0, "side": "SHORT"})
+                position = None
+                last_exit_price = p
+            elif ret <= -0.0150:  # Stop loss +1.50% against short
+                pnl = (entry_price - p) * (short_alloc / entry_price) - (short_alloc * 0.002)
+                trades.append({"pnl": pnl, "win": pnl > 0, "side": "SHORT"})
+                position = None
+                last_exit_price = p
+                
+        # 2. Evaluate New Entries
+        if position is None:
+            sep_ok = True
+            if last_exit_price > 0 and abs(p - last_exit_price) / last_exit_price < reentry_sep:
+                sep_ok = False
+                
+            if sep_ok:
+                if c_rsi <= 30 or c_z <= -1.8:
+                    position = "LONG"
+                    entry_price = p
+                elif c_rsi >= 70 or c_z >= 1.8:
+                    position = "SHORT"
+                    entry_price = p
 
-    # 1. VolImbalance (0.35 weight)
+    num_trades = len(trades)
+    if num_trades == 0:
+        return {"symbol": symbol, "trades": 0, "win_rate": 0.0, "net_profit": 0.0, "pf": 0.0, "trades_per_day": 0.0}
+        
+    wins = [t for t in trades if t["pnl"] > 0]
+    losses = [t for t in trades if t["pnl"] <= 0]
+    net_profit = sum(t["pnl"] for t in trades)
+    gross_win = sum(t["pnl"] for t in wins)
+    gross_loss = abs(sum(t["pnl"] for t in losses))
+    pf = (gross_win / gross_loss) if gross_loss > 0 else (99.9 if gross_win > 0 else 0.0)
+    
+    return {
+        "symbol": symbol,
+        "trades": num_trades,
+        "trades_per_day": round(num_trades / 10.0, 1),
+        "win_rate": round(len(wins) / num_trades * 100.0, 2),
+        "net_profit": round(net_profit, 2),
+        "pf": round(pf, 2)
+    }
+
+
+# ==============================================================================
+# OPTION B: 3-MINUTE DUAL BREAKOUT ENGINE
+# ==============================================================================
+def run_option_b_3m_engine(symbol: str, df: pd.DataFrame) -> dict:
+    if df.empty or len(df) < 60:
+        return {"symbol": symbol, "trades": 0, "win_rate": 0.0, "net_profit": 0.0, "pf": 0.0, "trades_per_day": 0.0}
+        
+    # Resample to 3m bars
+    try:
+        df_3m = df.set_index("dt").resample("3min").agg({
+            "open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"
+        }).dropna().reset_index()
+    except Exception:
+        df_3m = df
+        
+    close = df_3m["close"]
+    volume = df_3m["volume"]
+    open_p = df_3m["open"]
+    high_p = df_3m["high"]
+    low_p = df_3m["low"]
+    
+    # Calculate S_alpha
     candle_dir = (close - open_p) * volume
     candle_range = (high_p - low_p).replace(0, np.nan).fillna(0.001) * volume
     vol_imbalance = (candle_dir.rolling(10, min_periods=3).sum() / candle_range.rolling(10, min_periods=3).sum()).fillna(0.0).clip(-1.0, 1.0)
     
-    # 2. RelStrength (0.35 weight)
-    ret_15m = close.pct_change(15)
-    vol_60m = close.pct_change().rolling(60, min_periods=10).std().replace(0, np.nan).fillna(0.001)
-    rel_strength = (ret_15m / (vol_60m * np.sqrt(15))).clip(-3.0, 3.0) / 3.0
+    ret_15m = close.pct_change(5)  # 5 * 3m = 15m return
+    vol_60m = close.pct_change().rolling(20, min_periods=5).std().replace(0, np.nan).fillna(0.001)
+    rel_strength = (ret_15m / (vol_60m * np.sqrt(5))).clip(-3.0, 3.0) / 3.0
     
-    # 3. MomSlope (0.20 weight)
-    ret_5m = close.pct_change(5)
-    mom_slope = ((ret_5m - ret_15m) / vol_60m).clip(-3.0, 3.0) / 3.0
+    ret_3m = close.pct_change(1)
+    mom_slope = ((ret_3m - ret_15m) / vol_60m).clip(-3.0, 3.0) / 3.0
     
-    # 4. TrendAlignment (0.10 weight)
     ma5 = close.rolling(5, min_periods=1).mean()
     ma20 = close.rolling(20, min_periods=5).mean()
     trend_align = np.sign(ma5 - ma20) * ((ma5 - ma20).abs() / (ma20 * 0.005)).clip(0.0, 1.0)
     
-    s_alpha = (0.35 * vol_imbalance + 0.35 * rel_strength + 0.20 * mom_slope + 0.10 * trend_align).clip(-1.0, 1.0)
+    s_alpha = (0.35 * vol_imbalance + 0.35 * rel_strength + 0.20 * mom_slope + 0.10 * trend_align).clip(-1.0, 1.0).values
     
-    # 15-minute Micro-Squeeze Filter: 15-bar 1m Bollinger Bandwidth <= 1.20%
     bb_mid = ma20
     bb_std = close.rolling(15, min_periods=5).std()
-    bb_width = (2.0 * bb_std / bb_mid).fillna(0.05)
+    bb_width = ((2.0 * bb_std / bb_mid).fillna(0.05)).values
     is_squeeze = bb_width <= 0.0120
     
-    return s_alpha, is_squeeze, vol_60m
-
-
-def run_backtest_symbol(symbol: str, df: pd.DataFrame, initial_capital: float = 100_000.0) -> dict:
-    if df.empty or len(df) < 30:
-        return {
-            "symbol": symbol,
-            "bars": len(df),
-            "trades": 0,
-            "win_rate": 0.0,
-            "net_profit": 0.0,
-            "return_pct": 0.0,
-            "profit_factor": 0.0,
-            "max_drawdown": 0.0,
-            "long_trades": 0,
-            "short_trades": 0,
-            "trades_per_day": 0.0,
-        }
-        
-    close = df["close"].values
-    s_alpha_series, squeeze_series, vol_series = compute_alpha_score(df)
-    s_alpha = s_alpha_series.values
-    is_squeeze = squeeze_series.values
-    vol_60m = vol_series.values
-    
+    c_arr = close.values
     is_largecap = symbol in LARGECAP_COINS
-    reentry_sep_pct = 0.0100 if is_largecap else 0.0200
+    long_alloc = 8000.0 if is_largecap else 5000.0
+    short_alloc = 1000.0
+    reentry_sep = 0.0080
     
-    position = None  # None, "LONG", or "SHORT"
+    position = None
     entry_price = 0.0
-    entry_bar = 0
-    target_pct = 0.010  # Dynamic Target %
-    
-    short_alloc_usd = 1000.0  # Strict $1,000 USD cap for short positions
-    long_alloc_usd = 5000.0 if not is_largecap else 8000.0
-    
-    last_exit_price = 0.0
     peak_price = 0.0
     trough_price = 0.0
-    
+    last_exit_price = 0.0
     trades = []
     
-    for i in range(15, len(close)):
-        p = close[i]
+    for i in range(20, len(c_arr)):
+        p = c_arr[i]
         alpha = s_alpha[i]
-        in_squeeze = is_squeeze[i]
-        vol_val = vol_60m[i] if not np.isnan(vol_60m[i]) and vol_60m[i] > 0 else 0.002
+        in_sq = is_squeeze[i]
         
-        # 1. Manage Active Position
         if position == "LONG":
             peak_price = max(peak_price, p)
             ret = (p - entry_price) / entry_price
             peak_ret = (peak_price - entry_price) / entry_price
             
-            # Dynamic Target-Proportional Exits for Long:
-            # - Stop Loss: ret <= -1.0 * target_pct
-            # - Ratchet 2: Peak >= 80% target -> Lock 60% target floor
-            # - Ratchet 1: Peak >= 50% target -> Lock 30% target floor
-            # - Signal Reversal: S_alpha <= -0.35
-            target_r1 = target_pct * 0.50
-            lock_r1 = target_pct * 0.30
-            target_r2 = target_pct * 0.80
-            lock_r2 = target_pct * 0.60
-            
-            should_exit = False
-            exit_reason = ""
-            
-            if ret <= -target_pct:
-                should_exit = True
-                exit_reason = f"Adaptive Stop-Loss (-{target_pct*100:.2f}%)"
-            elif peak_ret >= target_r2 and ret <= lock_r2:
-                should_exit = True
-                exit_reason = f"Adaptive Ratchet 80% (+{lock_r2*100:.2f}%)"
-            elif peak_ret >= target_r1 and ret <= lock_r1:
-                should_exit = True
-                exit_reason = f"Adaptive Ratchet 50% (+{lock_r1*100:.2f}%)"
-            elif alpha <= -0.35:
-                should_exit = True
-                exit_reason = "Signal Reversal"
-                
-            if should_exit:
-                pnl = (p - entry_price) * (long_alloc_usd / entry_price) - (long_alloc_usd * 0.002) # 0.20% fee
-                trades.append({
-                    "side": "LONG",
-                    "entry_price": entry_price,
-                    "exit_price": p,
-                    "pnl": pnl,
-                    "pnl_pct": (p - entry_price) / entry_price - 0.002,
-                    "reason": exit_reason,
-                    "holding_bars": i - entry_bar,
-                })
+            if ret >= 0.0080:  # TP +0.80%
+                pnl = (p - entry_price) * (long_alloc / entry_price) - (long_alloc * 0.002)
+                trades.append({"pnl": pnl, "win": pnl > 0, "side": "LONG"})
+                position = None
+                last_exit_price = p
+            elif peak_ret >= 0.0050 and ret <= 0.0030: # Ratchet lock +0.30%
+                pnl = (p - entry_price) * (long_alloc / entry_price) - (long_alloc * 0.002)
+                trades.append({"pnl": pnl, "win": pnl > 0, "side": "LONG"})
+                position = None
+                last_exit_price = p
+            elif ret <= -0.0180: # SL -1.80%
+                pnl = (p - entry_price) * (long_alloc / entry_price) - (long_alloc * 0.002)
+                trades.append({"pnl": pnl, "win": pnl > 0, "side": "LONG"})
                 position = None
                 last_exit_price = p
                 
         elif position == "SHORT":
             trough_price = min(trough_price, p)
-            ret = (entry_price - p) / entry_price  # positive when price drops
+            ret = (entry_price - p) / entry_price
             max_drop = (entry_price - trough_price) / entry_price
             
-            target_r1 = target_pct * 0.50
-            lock_r1 = target_pct * 0.30
-            target_r2 = target_pct * 0.80
-            lock_r2 = target_pct * 0.60
-            
-            should_exit = False
-            exit_reason = ""
-            
-            if (p - entry_price) / entry_price >= target_pct: # Short Stop Loss
-                should_exit = True
-                exit_reason = f"Adaptive Short Stop (+{target_pct*100:.2f}%)"
-            elif max_drop >= target_r2 and ret <= lock_r2:
-                should_exit = True
-                exit_reason = f"Adaptive Short Ratchet 80% (+{lock_r2*100:.2f}%)"
-            elif max_drop >= target_r1 and ret <= lock_r1:
-                should_exit = True
-                exit_reason = f"Adaptive Short Ratchet 50% (+{lock_r1*100:.2f}%)"
-            elif alpha >= 0.35:
-                should_exit = True
-                exit_reason = "Signal Reversal"
-                
-            if should_exit:
-                pnl = (entry_price - p) * (short_alloc_usd / entry_price) - (short_alloc_usd * 0.002)
-                trades.append({
-                    "side": "SHORT",
-                    "entry_price": entry_price,
-                    "exit_price": p,
-                    "pnl": pnl,
-                    "pnl_pct": (entry_price - p) / entry_price - 0.002,
-                    "reason": exit_reason,
-                    "holding_bars": i - entry_bar,
-                })
+            if ret >= 0.0080:  # TP +0.80%
+                pnl = (entry_price - p) * (short_alloc / entry_price) - (short_alloc * 0.002)
+                trades.append({"pnl": pnl, "win": pnl > 0, "side": "SHORT"})
+                position = None
+                last_exit_price = p
+            elif max_drop >= 0.0050 and ret <= 0.0030: # Ratchet lock +0.30%
+                pnl = (entry_price - p) * (short_alloc / entry_price) - (short_alloc * 0.002)
+                trades.append({"pnl": pnl, "win": pnl > 0, "side": "SHORT"})
+                position = None
+                last_exit_price = p
+            elif ret <= -0.0180: # SL +1.80%
+                pnl = (entry_price - p) * (short_alloc / entry_price) - (short_alloc * 0.002)
+                trades.append({"pnl": pnl, "win": pnl > 0, "side": "SHORT"})
                 position = None
                 last_exit_price = p
                 
-        # 2. Evaluate New Entries (Calculate Dynamic Target % upon Entry)
         if position is None:
             sep_ok = True
-            if last_exit_price > 0:
-                dist = abs(p - last_exit_price) / last_exit_price
-                if dist < reentry_sep_pct:
-                    sep_ok = False
-                    
-            if sep_ok and in_squeeze:
-                calc_target = abs(alpha) * vol_val * np.sqrt(15)
-                target_pct = max(0.0060, min(0.0350, calc_target)) # Dynamic Target bounded [0.60%, 3.50%]
+            if last_exit_price > 0 and abs(p - last_exit_price) / last_exit_price < reentry_sep:
+                sep_ok = False
                 
-                if alpha >= 0.35:
+            if sep_ok and in_sq:
+                if alpha >= 0.30:
                     position = "LONG"
                     entry_price = p
-                    entry_bar = i
                     peak_price = p
-                elif alpha <= -0.35:
+                elif alpha <= -0.30:
                     position = "SHORT"
                     entry_price = p
-                    entry_bar = i
                     trough_price = p
 
-    # Performance Metrics
     num_trades = len(trades)
-    days_in_sample = max(1.0, len(close) / 1440.0)
-    trades_per_day = round(num_trades / days_in_sample, 1)
-    
     if num_trades == 0:
-        return {
-            "symbol": symbol,
-            "bars": len(close),
-            "trades": 0,
-            "win_rate": 0.0,
-            "net_profit": 0.0,
-            "return_pct": 0.0,
-            "profit_factor": 0.0,
-            "max_drawdown": 0.0,
-            "long_trades": 0,
-            "short_trades": 0,
-            "trades_per_day": 0.0,
-        }
+        return {"symbol": symbol, "trades": 0, "win_rate": 0.0, "net_profit": 0.0, "pf": 0.0, "trades_per_day": 0.0}
         
     wins = [t for t in trades if t["pnl"] > 0]
     losses = [t for t in trades if t["pnl"] <= 0]
-    win_rate = len(wins) / num_trades * 100.0
     net_profit = sum(t["pnl"] for t in trades)
     gross_win = sum(t["pnl"] for t in wins)
     gross_loss = abs(sum(t["pnl"] for t in losses))
-    profit_factor = (gross_win / gross_loss) if gross_loss > 0 else (99.9 if gross_win > 0 else 0.0)
-    
-    long_cnt = sum(1 for t in trades if t["side"] == "LONG")
-    short_cnt = sum(1 for t in trades if t["side"] == "SHORT")
+    pf = (gross_win / gross_loss) if gross_loss > 0 else (99.9 if gross_win > 0 else 0.0)
     
     return {
         "symbol": symbol,
-        "bars": len(close),
         "trades": num_trades,
-        "trades_per_day": trades_per_day,
-        "win_rate": round(win_rate, 2),
+        "trades_per_day": round(num_trades / 10.0, 1),
+        "win_rate": round(len(wins) / num_trades * 100.0, 2),
         "net_profit": round(net_profit, 2),
-        "profit_factor": round(profit_factor, 2),
-        "long_trades": long_cnt,
-        "short_trades": short_cnt,
+        "pf": round(pf, 2)
     }
 
 
-def generate_markdown_report(results: list[dict], report_path: str = "ALPHA_MODEL_3MONTH_BACKTEST_REPORT.md"):
-    total_trades = sum(r["trades"] for r in results)
-    total_net_profit = sum(r["net_profit"] for r in results)
-    avg_win_rate = np.mean([r["win_rate"] for r in results if r["trades"] > 0]) if total_trades > 0 else 0.0
-    avg_pf = np.mean([r["profit_factor"] for r in results if r["trades"] > 0 and r["profit_factor"] < 50]) if total_trades > 0 else 0.0
+def generate_comparison_report(res_a: list[dict], res_b: list[dict], report_path: str = "ALPHA_MODEL_3MONTH_BACKTEST_REPORT.md"):
+    total_trades_a = sum(r["trades"] for r in res_a)
+    total_pnl_a = sum(r["net_profit"] for r in res_a)
+    avg_wr_a = np.mean([r["win_rate"] for r in res_a if r["trades"] > 0]) if total_trades_a > 0 else 0.0
     
+    total_trades_b = sum(r["trades"] for r in res_b)
+    total_pnl_b = sum(r["net_profit"] for r in res_b)
+    avg_wr_b = np.mean([r["win_rate"] for r in res_b if r["trades"] > 0]) if total_trades_b > 0 else 0.0
+
     md_lines = [
-        "# ⚡ 10-Day Dynamic Expected Target ($S_{\\alpha}$) Backtest Report",
+        "# ⚔️ High-Frequency 10-Day Strategy Backtest Comparison",
         "",
         "## Executive Summary",
-        f"- **Tested Horizon**: **Last 10 Full Days** (14,400 1-minute bars per coin ending yesterday)",
-        f"- **Formula**: $S_{{\\alpha}} = 0.35 \\cdot \\text{{VolImbalance}} + 0.35 \\cdot \\text{{RelStrength}} + 0.20 \\cdot \\text{{MomSlope}} + 0.10 \\cdot \\text{{TrendAlignment}}$",
-        f"- **Dynamic Target %**: $R_{{\\text{{target}}}} = |S_{{\\alpha}}| \\cdot \\sigma_{{60\\text{{m}}}} \\cdot \\sqrt{{15}}$ (bounded $[0.60\\%, 3.50\\%]$)",
-        f"- **Adaptive Ratchets**: Lock 30% of target at 50% progress, lock 60% of target at 80% progress",
-        f"- **Total Portfolio Net Profit (10 Days)**: **+${total_net_profit:,.2f} USD**",
-        f"- **Total Trades Executed**: {total_trades}",
-        f"- **Average Win Rate**: **{avg_win_rate:.2f}%**",
-        f"- **Average Profit Factor**: **{avg_pf:.2f}**",
-        "- **Short Position Allocation**: Capped at strict **$1,000 USD** per short trade",
-        "- **Re-Entry Protection**: 1.0% Large-Cap / 2.0% Mid-Cap Price Separation Guard",
+        f"- **Option A (1m Micro-Dip Scalper)**: Net Profit **+${total_pnl_a:,.2f} USD** | Total Trades: **{total_trades_a}** ({total_trades_a/10:.1f}/day) | Avg Win Rate: **{avg_wr_a:.1f}%**",
+        f"- **Option B (3m Dual Breakout Engine)**: Net Profit **+${total_pnl_b:,.2f} USD** | Total Trades: **{total_trades_b}** ({total_trades_b/10:.1f}/day) | Avg Win Rate: **{avg_wr_b:.1f}%**",
         "",
-        "## Per-Coin Performance Breakdown",
+        "## Per-Coin Strategy Comparison",
         "",
-        "| Symbol | Sleeve | 1m Bars | Total Trades | Trades/Day | Long Trades | Short Trades | Win Rate (%) | Profit Factor | Net Profit ($) |",
-        "|---|---|---|---|---|---|---|---|---|---|",
+        "| Symbol | Option A Trades | Opt A Trades/Day | Opt A Win% | Opt A PnL ($) | Option B Trades | Opt B Trades/Day | Opt B Win% | Opt B PnL ($) |",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
     
-    for r in results:
-        sleeve = "Large-Cap" if r["symbol"] in LARGECAP_COINS else "Mid-Cap"
+    dict_b = {r["symbol"]: r for r in res_b}
+    for r_a in res_a:
+        sym = r_a["symbol"]
+        r_b = dict_b.get(sym, {"trades": 0, "trades_per_day": 0, "win_rate": 0, "net_profit": 0})
         md_lines.append(
-            f"| {r['symbol']} | {sleeve} | {r['bars']:,} | {r['trades']} | {r.get('trades_per_day', 0.0)} | {r['long_trades']} | {r['short_trades']} | {r['win_rate']:.2f}% | {r['profit_factor']:.2f} | ${r['net_profit']:,.2f} |"
+            f"| {sym} | {r_a['trades']} | {r_a['trades_per_day']} | {r_a['win_rate']}% | ${r_a['net_profit']:,.2f} | {r_b['trades']} | {r_b['trades_per_day']} | {r_b['win_rate']}% | ${r_b['net_profit']:,.2f} |"
         )
         
     md_lines.extend([
         "",
-        "## Conclusion & Dynamic Target Validation",
-        "Dynamic Target % calculation adapts ratchet levels to each coin's volatility, locking in quick gains on fast movers while letting trends run on high-volatility expansions.",
+        "## Strategy Verdict",
+        "This comparison details trade frequency, win rates, and net returns between 1-minute Micro-Dip Scalping vs 3-minute Dual Breakout expansion engines.",
         "",
         "*Report auto-generated by `scripts/backtest_alpha_model.py`.*"
     ])
@@ -382,22 +369,28 @@ def generate_markdown_report(results: list[dict], report_path: str = "ALPHA_MODE
     with open(report_path, "w") as f:
         f.write("\n".join(md_lines))
         
-    print(f"\n✅ Markdown Backtest Report generated at: {report_path}")
+    print(f"\n✅ Comparison Markdown Report generated at: {report_path}")
 
 
 def main():
     print("================================================================================")
-    print("⚡ 10-DAY DYNAMIC EXPECTED TARGET ALPHA MODEL ($S_alpha$) BACKTEST ENGINE")
+    print("⚔️ 10-DAY HIGH-FREQUENCY STRATEGY BACKTEST COMPARISON (OPTION A VS OPTION B)")
     print("================================================================================")
     
-    results = []
+    results_a = []
+    results_b = []
+    
     for coin in ALL_COINS:
         df = load_coin_data(coin)
-        res = run_backtest_symbol(coin, df)
-        results.append(res)
-        print(f"[{res['symbol']}] 1m Bars: {res['bars']:,} | Trades: {res['trades']} ({res.get('trades_per_day', 0.0)}/day) | Win Rate: {res['win_rate']}% | PF: {res['profit_factor']} | PnL: ${res['net_profit']:,.2f}")
+        res_a = run_option_a_scalper(coin, df)
+        res_b = run_option_b_3m_engine(coin, df)
         
-    generate_markdown_report(results)
+        results_a.append(res_a)
+        results_b.append(res_b)
+        
+        print(f"[{coin}] Opt A: {res_a['trades']} trades ({res_a['trades_per_day']}/day), WR {res_a['win_rate']}%, PnL ${res_a['net_profit']:,.2f} | Opt B: {res_b['trades']} trades ({res_b['trades_per_day']}/day), WR {res_b['win_rate']}%, PnL ${res_b['net_profit']:,.2f}")
+        
+    generate_comparison_report(results_a, results_b)
 
 
 if __name__ == "__main__":
