@@ -283,7 +283,16 @@ def process_largecap_sleeve(raw_data: dict[str, pd.DataFrame]):
         stop_price = latest_price - (stop_loss_k * vol_distance)
         take_profit_price = latest_price + (take_profit_k * vol_distance)
 
-        final_size = sizing.calculate_position_size(raw_signal, realized_vol, max_position=getattr(config, "MAX_POSITION_PER_ASSET", 0.08))
+        # Check Programmatic Deep-Dip Booster Sizing
+        booster_pairs = getattr(config, "DEEP_DIP_BOOSTER_PAIRS", [])
+        lb_24h = min(1440, len(df) - 1)
+        ret_24h = float(latest_price / df[price_col].iloc[-lb_24h] - 1.0) if lb_24h > 0 else 0.0
+        if pair in booster_pairs and ret_24h <= getattr(config, "DEEP_DIP_TRIGGER_THRESHOLD_PCT", -0.050):
+            final_size = getattr(config, "DEEP_DIP_BOOSTER_POSITION_SIZE", 0.070)
+            log.info("🔥 [LARGECAP DEEP-DIP BOOSTER TRIGGERED] %s: 24h Drop %.2f%% <= -5.0%%. Elevating position size to %.1f%% ($%.2f USD).", pair, ret_24h * 100.0, final_size * 100.0, account_equity * final_size)
+        else:
+            final_size = sizing.calculate_position_size(raw_signal, realized_vol, max_position=getattr(config, "MAX_POSITION_PER_ASSET", 0.08))
+
         if final_size <= 0:
             continue
 
@@ -531,8 +540,17 @@ def process_midcap_sleeve(raw_data: dict[str, pd.DataFrame]):
         stop_price = latest_price - (stop_loss_k * vol_distance)
         take_profit_price = latest_price + (take_profit_k * vol_distance)
 
-        # Mid-Cap Allocation (5% = $5,000 USD max per coin)
-        target_usd_cost = account_equity * getattr(config, "MIDCAP_MAX_POSITION_PER_ASSET", 0.05)
+        # Check Programmatic Deep-Dip Booster Sizing for Mid-Cap (e.g. ENA)
+        booster_pairs = getattr(config, "DEEP_DIP_BOOSTER_PAIRS", [])
+        lb_24h = min(1440, len(df) - 1)
+        ret_24h = float(latest_price / df[price_col].iloc[-lb_24h] - 1.0) if lb_24h > 0 else 0.0
+        if pair in booster_pairs and ret_24h <= getattr(config, "DEEP_DIP_TRIGGER_THRESHOLD_PCT", -0.050):
+            midcap_size = getattr(config, "DEEP_DIP_BOOSTER_POSITION_SIZE", 0.070)
+            log.info("🔥 [MIDCAP DEEP-DIP BOOSTER TRIGGERED] %s: 24h Drop %.2f%% <= -5.0%%. Elevating position size to %.1f%% ($%.2f USD).", pair, ret_24h * 100.0, midcap_size * 100.0, account_equity * midcap_size)
+        else:
+            midcap_size = getattr(config, "MIDCAP_MAX_POSITION_PER_ASSET", 0.05)
+
+        target_usd_cost = account_equity * midcap_size
 
         try:
             bal_resp = get_balance()

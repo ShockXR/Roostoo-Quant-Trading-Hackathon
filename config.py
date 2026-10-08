@@ -142,6 +142,11 @@ POST_STOP_LOSS_COOLDOWN_HOURS = 2    # 2 Hours post-stop-loss cool-down lockout 
 # --- Price-Separation Re-Entry Guards ---
 LARGECAP_REENTRY_SEPARATION_PCT = 0.0100  # Requires 1.0% price distance from last exit price for Large-Caps
 MIDCAP_REENTRY_SEPARATION_PCT = 0.0200    # Requires 2.0% price distance from last exit price for Mid-Caps
+
+# --- Deep-Dip High-Alpha Booster Configuration ---
+DEEP_DIP_BOOSTER_PAIRS = ["AVAX/USD", "ENA/USD", "ADA/USD", "SUI/USD"]
+DEEP_DIP_BOOSTER_POSITION_SIZE = 0.070  # 7.0% of portfolio equity ($7,000 USD per coin)
+DEEP_DIP_TRIGGER_THRESHOLD_PCT = -0.050 # Triggers booster when 24h drop >= -5.0%
 # --- Separate Dynamic Trailing Profit Ratchets ---
 # Large-Cap Ratchet (Precision Tighter Locking for Lower-Volatility Majors)
 LARGECAP_TRAILING_RATCHETS = [
