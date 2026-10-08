@@ -533,8 +533,9 @@ def process_midcap_sleeve(raw_data: dict[str, pd.DataFrame]):
                     record_last_exit_price(pair, latest_price)
                     continue
 
-                # Rule 3: Profit-Gated Rank Rotation (Rank-out + Net Profit >= +0.30%)
-                if not is_in_top_rank and latest_price >= min_fee_tp:
+                # Rule 3: Profit-Gated Rank Rotation (Rank-out + Net Profit >= +0.30%) -- Bypassed for Booster pairs (e.g. ENA)
+                booster_pairs = getattr(config, "DEEP_DIP_BOOSTER_PAIRS", [])
+                if not is_in_top_rank and pair not in booster_pairs and latest_price >= min_fee_tp:
                     log.info("🔄 [MIDCAP RULE 3: PROFIT-GATED RANK ROTATION] %s: Left top rank & reached net profit ($%.4f >= $%.4f). Executing SELL.", pair, latest_price, min_fee_tp)
                     if not DRY_RUN and quantity > 0:
                         place_order(pair, "SELL", quantity=quantity)
