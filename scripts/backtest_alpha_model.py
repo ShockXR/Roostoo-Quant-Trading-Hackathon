@@ -4,7 +4,7 @@
 Optimized Configuration:
 - Resampled to 5-Minute Candles (smooths micro-wicks, reduces fee friction)
 - Formula: S_alpha = 0.35 * VolImbalance + 0.35 * RelStrength + 0.20 * MomSlope + 0.10 * TrendAlignment
-- Pre-Condition Gate: 20-bar Bollinger Bandwidth <= 0.80% (Strict Squeeze Compression)
+- Pre-Condition Gate: 20-bar 5m Bollinger Bandwidth <= 0.80% (Strict Squeeze Compression)
 - Higher Entry Conviction: |S_alpha| >= 0.55
 - Rules Enforced:
   - LONG Entry: S_alpha >= +0.55 AND Consolidation Squeeze
@@ -74,8 +74,16 @@ def load_coin_data(symbol: str) -> pd.DataFrame:
         # Resample to 5m bars to eliminate micro-noise
         ts_col = "timestamp" if "timestamp" in df.columns else ("open_time" if "open_time" in df.columns else None)
         if ts_col:
-            unit = "ms" if df[ts_col].iloc[0] > 1e11 else "s"
-            df["dt"] = pd.to_datetime(df[ts_col], unit=unit, utc=True)
+            if pd.api.types.is_datetime64_any_dtype(df[ts_col]):
+                df["dt"] = df[ts_col]
+            else:
+                first_val = df[ts_col].iloc[0]
+                if isinstance(first_val, (int, float, np.number)):
+                    unit = "ms" if first_val > 1e11 else "s"
+                    df["dt"] = pd.to_datetime(df[ts_col], unit=unit, utc=True)
+                else:
+                    df["dt"] = pd.to_datetime(df[ts_col], utc=True)
+                    
             df = df.set_index("dt").resample("5min").agg({
                 "open": "first",
                 "high": "max",
