@@ -240,9 +240,47 @@ def process_largecap_sleeve(raw_data: dict[str, pd.DataFrame]):
                 record_last_exit_price(pair, latest_price)
                 continue
 
-            else:
-                log.info("[LARGECAP] %s: Position active (Holding: %dm, Price: $%.4f, Stop: $%.4f, TP: $%.4f)", pair, int(time_elapsed // 60), latest_price, stop_price, tp_price)
-                continue
+            # Check Deep-Dip Booster Top-Up for existing active positions
+            booster_pairs = getattr(config, "DEEP_DIP_BOOSTER_PAIRS", [])
+            lb_24h = min(1440, len(df) - 1)
+            ret_24h = float(latest_price / df[price_col].iloc[-lb_24h] - 1.0) if lb_24h > 0 else 0.0
+            if pair in booster_pairs and ret_24h <= getattr(config, "DEEP_DIP_TRIGGER_THRESHOLD_PCT", -0.050):
+                target_usd = account_equity * getattr(config, "DEEP_DIP_BOOSTER_POSITION_SIZE", 0.070)
+                curr_val = quantity * latest_price
+                needed_usd = target_usd - curr_val
+                if needed_usd >= 500.0:
+                    try:
+                        bal_resp = get_balance()
+                        if isinstance(bal_resp, dict) and bal_resp.get("Success"):
+                            free_usd = float(bal_resp.get("SpotWallet", {}).get("USD", {}).get("Free", account_equity))
+                            if needed_usd > free_usd:
+                                needed_usd = max(0.0, free_usd * 0.95)
+                    except Exception:
+                        pass
+
+                    if needed_usd >= 100.0:
+                        top_up_qty = needed_usd / max(1e-6, latest_price)
+                        new_qty = quantity + top_up_qty
+                        new_entry = ((quantity * entry_price) + (top_up_qty * latest_price)) / new_qty
+                        vol_dist = latest_price * vol_24h * np.sqrt(1440)
+                        sl_k = getattr(config, "STOP_LOSS_K", 3.0)
+                        tp_k = getattr(config, "TAKE_PROFIT_K", 1.5)
+                        new_stop = new_entry - (sl_k * vol_dist)
+                        new_tp = new_entry + (tp_k * vol_dist)
+
+                        pos["quantity"] = new_qty
+                        pos["entry_price"] = new_entry
+                        pos["stop_price"] = new_stop
+                        pos["take_profit_price"] = new_tp
+                        ACTIVE_POSITIONS[pair] = pos
+                        save_active_positions()
+
+                        log.info("🔥 [LARGECAP DEEP-DIP BOOSTER TOP-UP] Top-Up executed for %s: Bought %.4f coins @ $%.4f ($%.2f USD). New total: %.4f coins @ avg $%.4f", pair, top_up_qty, latest_price, needed_usd, new_qty, new_entry)
+                        if not DRY_RUN:
+                            place_order(pair, "BUY", quantity=top_up_qty)
+
+            log.info("[LARGECAP] %s: Position active (Holding: %dm, Price: $%.4f, Stop: $%.4f, TP: $%.4f)", pair, int(time_elapsed // 60), latest_price, stop_price, tp_price)
+            continue
 
         # Check Price-Separation Re-Entry Guard (Requires 1.0% distance from last exit price)
         last_exit_p = load_last_exit_prices().get(pair, 0.0)
@@ -258,14 +296,16 @@ def process_largecap_sleeve(raw_data: dict[str, pd.DataFrame]):
         if len(df) < min_bars_needed:
             continue
 
+        booster_pairs = getattr(config, "DEEP_DIP_BOOSTER_PAIRS", [])
+        lb_24h = min(1440, len(df) - 1)
+        ret_24h = float(latest_price / df[price_col].iloc[-lb_24h] - 1.0) if lb_24h > 0 else 0.0
+        is_booster_dip = (pair in booster_pairs and ret_24h <= getattr(config, "DEEP_DIP_TRIGGER_THRESHOLD_PCT", -0.050))
+
         strat_fn = strategy.STRATEGIES.get(SELECTED_STRATEGY, strategy._reversal)
         signals = strat_fn(pair, raw_data, None, df, {})
 
-        if signals is None or signals.empty:
-            continue
-
-        raw_signal = signals.iloc[-1]
-        if raw_signal <= 0:
+        raw_signal = signals.iloc[-1] if (signals is not None and not signals.empty) else 0.0
+        if raw_signal <= 0 and not is_booster_dip:
             continue
 
         realized_vol = df[price_col].pct_change().rolling(30, min_periods=5).std().iloc[-1]
@@ -503,11 +543,55 @@ def process_midcap_sleeve(raw_data: dict[str, pd.DataFrame]):
                     record_last_exit_price(pair, latest_price)
                     continue
 
+                # Check Deep-Dip Booster Top-Up for existing active midcap positions
+                booster_pairs = getattr(config, "DEEP_DIP_BOOSTER_PAIRS", [])
+                lb_24h = min(1440, len(df) - 1)
+                ret_24h = float(latest_price / df[price_col].iloc[-lb_24h] - 1.0) if lb_24h > 0 else 0.0
+                if pair in booster_pairs and ret_24h <= getattr(config, "DEEP_DIP_TRIGGER_THRESHOLD_PCT", -0.050):
+                    target_usd = account_equity * getattr(config, "DEEP_DIP_BOOSTER_POSITION_SIZE", 0.070)
+                    curr_val = quantity * latest_price
+                    needed_usd = target_usd - curr_val
+                    if needed_usd >= 500.0:
+                        try:
+                            bal_resp = get_balance()
+                            if isinstance(bal_resp, dict) and bal_resp.get("Success"):
+                                free_usd = float(bal_resp.get("SpotWallet", {}).get("USD", {}).get("Free", account_equity))
+                                if needed_usd > free_usd:
+                                    needed_usd = max(0.0, free_usd * 0.95)
+                        except Exception:
+                            pass
+
+                        if needed_usd >= 100.0:
+                            top_up_qty = needed_usd / max(1e-6, latest_price)
+                            new_qty = quantity + top_up_qty
+                            new_entry = ((quantity * entry_price) + (top_up_qty * latest_price)) / new_qty
+                            vol_dist = latest_price * vol_24h * np.sqrt(1440)
+                            sl_k = getattr(config, "MIDCAP_STOP_LOSS_K", 3.5)
+                            tp_k = getattr(config, "MIDCAP_TAKE_PROFIT_K", 2.0)
+                            new_stop = new_entry - (sl_k * vol_dist)
+                            new_tp = new_entry + (tp_k * vol_dist)
+
+                            pos["quantity"] = new_qty
+                            pos["entry_price"] = new_entry
+                            pos["stop_price"] = new_stop
+                            pos["take_profit_price"] = new_tp
+                            ACTIVE_POSITIONS[pair] = pos
+                            save_active_positions()
+
+                            log.info("🔥 [MIDCAP DEEP-DIP BOOSTER TOP-UP] Top-Up executed for %s: Bought %.4f coins @ $%.4f ($%.2f USD). New total: %.4f coins @ avg $%.4f", pair, top_up_qty, latest_price, needed_usd, new_qty, new_entry)
+                            if not DRY_RUN:
+                                place_order(pair, "BUY", quantity=top_up_qty)
+
                 log.info("[MIDCAP] %s: Position active (In Top Rank: %s, Holding: %dm, Price: $%.4f, Stop: $%.4f, TP: $%.4f)", pair, is_in_top_rank, int(time_elapsed // 60), latest_price, stop_price, tp_price)
                 continue
 
-        # Strategy Entry Signal: Only buy if pair is in top_leaders
-        if pair not in top_leaders:
+        # Strategy Entry Signal: Only buy if pair is in top_leaders (or deep-dip booster is triggered)
+        booster_pairs = getattr(config, "DEEP_DIP_BOOSTER_PAIRS", [])
+        lb_24h = min(1440, len(df) - 1)
+        ret_24h = float(latest_price / df[price_col].iloc[-lb_24h] - 1.0) if lb_24h > 0 else 0.0
+        is_booster_dip = (pair in booster_pairs and ret_24h <= getattr(config, "DEEP_DIP_TRIGGER_THRESHOLD_PCT", -0.050))
+
+        if pair not in top_leaders and not is_booster_dip:
             continue
 
         # Check Price-Separation Re-Entry Guard (Requires 2.0% distance from last exit price)
