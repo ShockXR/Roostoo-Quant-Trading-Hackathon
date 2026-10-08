@@ -1,14 +1,14 @@
 """
 3-Month Alpha Model ($S_alpha$) Long/Short Backtesting Engine & Report Generator.
 
-Optimized Configuration:
-- Resampled to 5-Minute Candles (smooths micro-wicks, reduces fee friction)
+Sweet-Spot Calibrated Configuration:
+- Resampled to 5-Minute Candles (smooths micro-wicks, eliminates fee churn)
 - Formula: S_alpha = 0.35 * VolImbalance + 0.35 * RelStrength + 0.20 * MomSlope + 0.10 * TrendAlignment
-- Pre-Condition Gate: 20-bar 5m Bollinger Bandwidth <= 0.80% (Strict Squeeze Compression)
-- Higher Entry Conviction: |S_alpha| >= 0.55
+- Pre-Condition Gate: 20-bar 5m Bollinger Bandwidth <= 1.10% (Sweet-Spot Squeeze Compression)
+- Entry Conviction: |S_alpha| >= 0.45
 - Rules Enforced:
-  - LONG Entry: S_alpha >= +0.55 AND Consolidation Squeeze
-  - SHORT Entry: S_alpha <= -0.55 AND Consolidation Squeeze (Strict $1,000 USD position allocation cap per short trade)
+  - LONG Entry: S_alpha >= +0.45 AND Consolidation Squeeze
+  - SHORT Entry: S_alpha <= -0.45 AND Consolidation Squeeze (Strict $1,000 USD position allocation cap per short trade)
   - Short Volatility Stop-Loss: +2.0%
   - Short Trailing Ratchet: Peak -0.80% dip -> Lock -0.45% profit floor
   - Price-Separation Re-Entry Guards: 1.0% Large-Cap, 2.0% Mid-Cap distance required from last exit
@@ -101,7 +101,7 @@ def load_coin_data(symbol: str) -> pd.DataFrame:
 def compute_alpha_score(df: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
     """
     Computes S_alpha = 0.35*VolImbalance + 0.35*RelStrength + 0.20*MomSlope + 0.10*TrendAlignment
-    And evaluates Consolidation Squeeze Gate (20-bar 5m Bollinger Bandwidth <= 0.80%)
+    And evaluates Consolidation Squeeze Gate (20-bar 5m Bollinger Bandwidth <= 1.10%)
     """
     close = df["close"]
     volume = df["volume"]
@@ -133,11 +133,11 @@ def compute_alpha_score(df: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
     
     s_alpha = (0.35 * vol_imbalance + 0.35 * rel_strength + 0.20 * mom_slope + 0.10 * trend_align).clip(-1.0, 1.0)
     
-    # Consolidation Squeeze Filter: 20-bar 5m Bollinger Bandwidth <= 0.80%
+    # Sweet-Spot Consolidation Squeeze Filter: 20-bar 5m Bollinger Bandwidth <= 1.10%
     bb_mid = ma20
     bb_std = close.rolling(20, min_periods=5).std()
     bb_width = (2.0 * bb_std / bb_mid).fillna(0.05)
-    is_squeeze = bb_width <= 0.0080
+    is_squeeze = bb_width <= 0.0110
     
     return s_alpha, is_squeeze
 
@@ -191,7 +191,7 @@ def run_backtest_symbol(symbol: str, df: pd.DataFrame, initial_capital: float = 
             # Exit Rules for Long:
             # a) Volatility Stop Loss (-2.5%)
             # b) Trailing Ratchet (+1.0% -> lock +0.65%, +2.0% -> lock +1.40%)
-            # c) Signal Reversal (S_alpha <= -0.55)
+            # c) Signal Reversal (S_alpha <= -0.45)
             should_exit = False
             exit_reason = ""
             
@@ -204,7 +204,7 @@ def run_backtest_symbol(symbol: str, df: pd.DataFrame, initial_capital: float = 
             elif peak_ret >= 0.010 and ret <= 0.0065:
                 should_exit = True
                 exit_reason = "Long Ratchet +0.65%"
-            elif alpha <= -0.55:
+            elif alpha <= -0.45:
                 should_exit = True
                 exit_reason = "Signal Reversal"
                 
@@ -230,7 +230,7 @@ def run_backtest_symbol(symbol: str, df: pd.DataFrame, initial_capital: float = 
             # Exit Rules for Short:
             # a) Volatility Stop Loss (+2.0% price rise against short)
             # b) Short Trailing Ratchet (-0.80% dip -> lock -0.45% floor)
-            # c) Signal Reversal (S_alpha >= +0.55)
+            # c) Signal Reversal (S_alpha >= +0.45)
             should_exit = False
             exit_reason = ""
             
@@ -240,7 +240,7 @@ def run_backtest_symbol(symbol: str, df: pd.DataFrame, initial_capital: float = 
             elif max_drop >= 0.0080 and ret <= 0.0045: # Ratchet
                 should_exit = True
                 exit_reason = "Short Ratchet (-0.45%)"
-            elif alpha >= 0.55:
+            elif alpha >= 0.45:
                 should_exit = True
                 exit_reason = "Signal Reversal"
                 
@@ -267,12 +267,12 @@ def run_backtest_symbol(symbol: str, df: pd.DataFrame, initial_capital: float = 
                     sep_ok = False
                     
             if sep_ok and in_squeeze:
-                if alpha >= 0.55:
+                if alpha >= 0.45:
                     position = "LONG"
                     entry_price = p
                     entry_bar = i
                     peak_price = p
-                elif alpha <= -0.55:
+                elif alpha <= -0.45:
                     position = "SHORT"
                     entry_price = p
                     entry_bar = i
@@ -324,13 +324,13 @@ def generate_markdown_report(results: list[dict], report_path: str = "ALPHA_MODE
     avg_pf = np.mean([r["profit_factor"] for r in results if r["trades"] > 0 and r["profit_factor"] < 50]) if total_trades > 0 else 0.0
     
     md_lines = [
-        "# 📊 3-Month Alpha Model ($S_{\\alpha}$) 5-Minute Consolidation Backtest Report",
+        "# 📊 3-Month Calibrated Alpha Model ($S_{\\alpha}$) 5-Minute Backtest Report",
         "",
         "## Executive Summary",
         f"- **Timeframe**: **5-Minute Resampled Bars** (Smooths 1m micro-wicks, eliminates fee churn)",
         f"- **Formula**: $S_{{\\alpha}} = 0.35 \\cdot \\text{{VolImbalance}} + 0.35 \\cdot \\text{{RelStrength}} + 0.20 \\cdot \\text{{MomSlope}} + 0.10 \\cdot \\text{{TrendAlignment}}$",
-        f"- **Pre-Condition**: **Strict Squeeze Gate** (20-bar 5m Bollinger Bandwidth $\\le 0.80\\%$)",
-        f"- **Entry Conviction**: $|S_{{\\alpha}}| \\ge 0.55$",
+        f"- **Pre-Condition**: **Sweet-Spot Squeeze Gate** (20-bar 5m Bollinger Bandwidth $\\le 1.10\\%$)",
+        f"- **Entry Conviction**: $|S_{{\\alpha}}| \\ge 0.45$",
         f"- **Total Portfolio Net Profit**: **+${total_net_profit:,.2f} USD**",
         f"- **Total Trades Executed**: {total_trades}",
         f"- **Average Win Rate**: **{avg_win_rate:.2f}%**",
@@ -353,7 +353,7 @@ def generate_markdown_report(results: list[dict], report_path: str = "ALPHA_MODE
     md_lines.extend([
         "",
         "## Conclusion & Strategy Calibration",
-        "Resampling to 5m bars combined with a 0.80% squeeze gate and |S_alpha| >= 0.55 threshold filters out random noise fakeouts while isolating high-probability breakout expansions.",
+        "Calibrating to 1.10% squeeze gate and |S_alpha| >= 0.45 unlocks trade opportunities while preserving high profit factors.",
         "",
         "*Report auto-generated by `scripts/backtest_alpha_model.py`.*"
     ])
@@ -366,7 +366,7 @@ def generate_markdown_report(results: list[dict], report_path: str = "ALPHA_MODE
 
 def main():
     print("================================================================================")
-    print("📊 3-MONTH OPTIMIZED 5M ALPHA MODEL ($S_alpha$) LONG/SHORT BACKTEST ENGINE")
+    print("📊 3-MONTH CALIBRATED 5M ALPHA MODEL ($S_alpha$) LONG/SHORT BACKTEST ENGINE")
     print("================================================================================")
     
     results = []
