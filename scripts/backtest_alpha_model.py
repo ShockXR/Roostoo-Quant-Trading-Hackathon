@@ -27,7 +27,7 @@ MIDCAP_COINS = [
 ]
 ALL_COINS = LARGECAP_COINS + MIDCAP_COINS
 
-DATA_DIRS = ["data_store", "binance_data"]
+DATA_DIRS = ["data_store", "data_store/processed", "binance_data", "binance_data/processed"]
 
 def load_coin_data(symbol: str) -> pd.DataFrame:
     """Finds and loads parquet or csv files for a given symbol across DATA_DIRS."""
@@ -36,10 +36,11 @@ def load_coin_data(symbol: str) -> pd.DataFrame:
     
     candidates = []
     for d in DATA_DIRS:
-        candidates.extend(glob.glob(f"{d}/{safe_symbol}*.parquet"))
-        candidates.extend(glob.glob(f"{d}/{raw_symbol}*.parquet"))
-        candidates.extend(glob.glob(f"{d}/{safe_symbol}*.csv"))
-        candidates.extend(glob.glob(f"{d}/{raw_symbol}*.csv"))
+        if os.path.exists(d):
+            candidates.extend(glob.glob(f"{d}/**/{safe_symbol}*.parquet", recursive=True))
+            candidates.extend(glob.glob(f"{d}/**/{raw_symbol}*.parquet", recursive=True))
+            candidates.extend(glob.glob(f"{d}/**/{safe_symbol}*.csv", recursive=True))
+            candidates.extend(glob.glob(f"{d}/**/{raw_symbol}*.csv", recursive=True))
         
     if not candidates:
         return pd.DataFrame()
@@ -59,6 +60,8 @@ def load_coin_data(symbol: str) -> pd.DataFrame:
             
         if "timestamp" in df.columns:
             df = df.sort_values("timestamp").reset_index(drop=True)
+        elif "open_time" in df.columns:
+            df = df.sort_values("open_time").reset_index(drop=True)
             
         return df
     except Exception as e:
