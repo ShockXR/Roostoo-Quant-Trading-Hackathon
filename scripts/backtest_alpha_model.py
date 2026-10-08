@@ -1,17 +1,17 @@
 """
-10-Day High-Velocity Alpha Model ($S_alpha$) Long/Short Backtesting Engine.
+10-Day High-Velocity Alpha Model ($S_alpha$) with Dynamic Target % & Adaptive Ratchets.
 
 Evaluates last 10 days of 1-minute bars (14,400 1m bars per coin) ending yesterday.
 
-High-Velocity Rules:
-- 15-Minute Micro-Squeeze Gate: 15-bar 1m Bollinger Bandwidth <= 1.20%
-- Entry Conviction: |S_alpha| >= 0.35
-- Fast Intraday Profit Ratchets:
-  - Long: Peak +0.45% -> Lock +0.25% floor, Peak +0.90% -> Lock +0.65% floor
-  - Short: Peak -0.45% dip -> Lock -0.25% floor (+0.05% net after 0.20% fee)
-- Position Allocation:
-  - LONG: $8,000 USD (Large-Cap) / $5,000 USD (Mid-Cap)
-  - SHORT: Strict $1,000 USD allocation cap per short trade
+Dynamic Features:
+- Expected Target %: R_target = |S_alpha| * Vol_60m * sqrt(15)
+- Adaptive Ratchet 1: Peak >= 50% R_target -> Lock 30% R_target profit floor
+- Adaptive Ratchet 2: Peak >= 80% R_target -> Lock 60% R_target profit floor
+- Adaptive Stop-Loss: Ret <= -1.0 * R_target (Long) / +1.0 * R_target (Short)
+
+Position Allocation:
+- LONG: $8,000 USD (Large-Cap) / $5,000 USD (Mid-Cap)
+- SHORT: Strict $1,000 USD allocation cap per short trade
 - Price-Separation Re-Entry Guards: 1.0% Large-Cap / 2.0% Mid-Cap distance required from last exit
 """
 import os
@@ -96,10 +96,10 @@ def load_coin_data(symbol: str) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def compute_alpha_score(df: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
+def compute_alpha_score(df: pd.DataFrame) -> tuple[pd.Series, pd.Series, pd.Series]:
     """
     Computes S_alpha = 0.35*VolImbalance + 0.35*RelStrength + 0.20*MomSlope + 0.10*TrendAlignment
-    Evaluates 15-minute Micro-Squeeze Gate (15-bar 1m Bollinger Bandwidth <= 1.20%)
+    Calculates 15m Micro-Squeeze Gate (BB Bandwidth <= 1.20%) and Rolling 60m Volatility.
     """
     close = df["close"]
     volume = df["volume"]
@@ -108,7 +108,7 @@ def compute_alpha_score(df: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
     low_p = df["low"]
     
     if len(close) < 30:
-        return pd.Series(0.0, index=close.index), pd.Series(False, index=close.index)
+        return pd.Series(0.0, index=close.index), pd.Series(False, index=close.index), pd.Series(0.002, index=close.index)
 
     # 1. VolImbalance (0.35 weight)
     candle_dir = (close - open_p) * volume
@@ -137,7 +137,7 @@ def compute_alpha_score(df: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
     bb_width = (2.0 * bb_std / bb_mid).fillna(0.05)
     is_squeeze = bb_width <= 0.0120
     
-    return s_alpha, is_squeeze
+    return s_alpha, is_squeeze, vol_60m
 
 
 def run_backtest_symbol(symbol: str, df: pd.DataFrame, initial_capital: float = 100_000.0) -> dict:
@@ -157,9 +157,10 @@ def run_backtest_symbol(symbol: str, df: pd.DataFrame, initial_capital: float = 
         }
         
     close = df["close"].values
-    s_alpha_series, squeeze_series = compute_alpha_score(df)
+    s_alpha_series, squeeze_series, vol_series = compute_alpha_score(df)
     s_alpha = s_alpha_series.values
     is_squeeze = squeeze_series.values
+    vol_60m = vol_series.values
     
     is_largecap = symbol in LARGECAP_COINS
     reentry_sep_pct = 0.0100 if is_largecap else 0.0200
@@ -167,6 +168,8 @@ def run_backtest_symbol(symbol: str, df: pd.DataFrame, initial_capital: float = 
     position = None  # None, "LONG", or "SHORT"
     entry_price = 0.0
     entry_bar = 0
+    target_pct = 0.010  # Dynamic Target %
+    
     short_alloc_usd = 1000.0  # Strict $1,000 USD cap for short positions
     long_alloc_usd = 5000.0 if not is_largecap else 8000.0
     
@@ -180,6 +183,7 @@ def run_backtest_symbol(symbol: str, df: pd.DataFrame, initial_capital: float = 
         p = close[i]
         alpha = s_alpha[i]
         in_squeeze = is_squeeze[i]
+        vol_val = vol_60m[i] if not np.isnan(vol_60m[i]) and vol_60m[i] > 0 else 0.002
         
         # 1. Manage Active Position
         if position == "LONG":
@@ -187,22 +191,28 @@ def run_backtest_symbol(symbol: str, df: pd.DataFrame, initial_capital: float = 
             ret = (p - entry_price) / entry_price
             peak_ret = (peak_price - entry_price) / entry_price
             
-            # Fast Intraday Exit Rules for Long:
-            # a) Volatility Stop Loss (-2.0%)
-            # b) Fast Intraday Ratchet (+0.45% -> lock +0.25%, +0.90% -> lock +0.65%)
-            # c) Signal Reversal (S_alpha <= -0.35)
+            # Dynamic Target-Proportional Exits for Long:
+            # - Stop Loss: ret <= -1.0 * target_pct
+            # - Ratchet 2: Peak >= 80% target -> Lock 60% target floor
+            # - Ratchet 1: Peak >= 50% target -> Lock 30% target floor
+            # - Signal Reversal: S_alpha <= -0.35
+            target_r1 = target_pct * 0.50
+            lock_r1 = target_pct * 0.30
+            target_r2 = target_pct * 0.80
+            lock_r2 = target_pct * 0.60
+            
             should_exit = False
             exit_reason = ""
             
-            if ret <= -0.020:
+            if ret <= -target_pct:
                 should_exit = True
-                exit_reason = "Long Stop-Loss (-2.0%)"
-            elif peak_ret >= 0.0090 and ret <= 0.0065:
+                exit_reason = f"Adaptive Stop-Loss (-{target_pct*100:.2f}%)"
+            elif peak_ret >= target_r2 and ret <= lock_r2:
                 should_exit = True
-                exit_reason = "Long Ratchet +0.65%"
-            elif peak_ret >= 0.0045 and ret <= 0.0025:
+                exit_reason = f"Adaptive Ratchet 80% (+{lock_r2*100:.2f}%)"
+            elif peak_ret >= target_r1 and ret <= lock_r1:
                 should_exit = True
-                exit_reason = "Long Ratchet +0.25%"
+                exit_reason = f"Adaptive Ratchet 50% (+{lock_r1*100:.2f}%)"
             elif alpha <= -0.35:
                 should_exit = True
                 exit_reason = "Signal Reversal"
@@ -226,19 +236,23 @@ def run_backtest_symbol(symbol: str, df: pd.DataFrame, initial_capital: float = 
             ret = (entry_price - p) / entry_price  # positive when price drops
             max_drop = (entry_price - trough_price) / entry_price
             
-            # Fast Intraday Exit Rules for Short:
-            # a) Volatility Stop Loss (+1.50% price rise against short)
-            # b) Short Fast Ratchet (-0.45% dip -> lock -0.25% floor)
-            # c) Signal Reversal (S_alpha >= +0.35)
+            target_r1 = target_pct * 0.50
+            lock_r1 = target_pct * 0.30
+            target_r2 = target_pct * 0.80
+            lock_r2 = target_pct * 0.60
+            
             should_exit = False
             exit_reason = ""
             
-            if (p - entry_price) / entry_price >= 0.015: # Short Stop Loss +1.50%
+            if (p - entry_price) / entry_price >= target_pct: # Short Stop Loss
                 should_exit = True
-                exit_reason = "Short Stop-Loss (+1.50%)"
-            elif max_drop >= 0.0045 and ret <= 0.0025: # Ratchet
+                exit_reason = f"Adaptive Short Stop (+{target_pct*100:.2f}%)"
+            elif max_drop >= target_r2 and ret <= lock_r2:
                 should_exit = True
-                exit_reason = "Short Ratchet (-0.25%)"
+                exit_reason = f"Adaptive Short Ratchet 80% (+{lock_r2*100:.2f}%)"
+            elif max_drop >= target_r1 and ret <= lock_r1:
+                should_exit = True
+                exit_reason = f"Adaptive Short Ratchet 50% (+{lock_r1*100:.2f}%)"
             elif alpha >= 0.35:
                 should_exit = True
                 exit_reason = "Signal Reversal"
@@ -257,7 +271,7 @@ def run_backtest_symbol(symbol: str, df: pd.DataFrame, initial_capital: float = 
                 position = None
                 last_exit_price = p
                 
-        # 2. Evaluate New Entries (Must pass 15m Micro-Squeeze Filter & Re-Entry Guard)
+        # 2. Evaluate New Entries (Calculate Dynamic Target % upon Entry)
         if position is None:
             sep_ok = True
             if last_exit_price > 0:
@@ -266,6 +280,9 @@ def run_backtest_symbol(symbol: str, df: pd.DataFrame, initial_capital: float = 
                     sep_ok = False
                     
             if sep_ok and in_squeeze:
+                calc_target = abs(alpha) * vol_val * np.sqrt(15)
+                target_pct = max(0.0060, min(0.0350, calc_target)) # Dynamic Target bounded [0.60%, 3.50%]
+                
                 if alpha >= 0.35:
                     position = "LONG"
                     entry_price = p
@@ -328,13 +345,13 @@ def generate_markdown_report(results: list[dict], report_path: str = "ALPHA_MODE
     avg_pf = np.mean([r["profit_factor"] for r in results if r["trades"] > 0 and r["profit_factor"] < 50]) if total_trades > 0 else 0.0
     
     md_lines = [
-        "# ⚡ 10-Day High-Velocity Alpha Model ($S_{\\alpha}$) Backtest Report",
+        "# ⚡ 10-Day Dynamic Expected Target ($S_{\\alpha}$) Backtest Report",
         "",
         "## Executive Summary",
         f"- **Tested Horizon**: **Last 10 Full Days** (14,400 1-minute bars per coin ending yesterday)",
         f"- **Formula**: $S_{{\\alpha}} = 0.35 \\cdot \\text{{VolImbalance}} + 0.35 \\cdot \\text{{RelStrength}} + 0.20 \\cdot \\text{{MomSlope}} + 0.10 \\cdot \\text{{TrendAlignment}}$",
-        f"- **Pre-Condition**: **15-Minute Micro-Squeeze Gate** (15-bar 1m Bollinger Bandwidth $\\le 1.20\\%$)",
-        f"- **Entry Conviction**: $|S_{{\\alpha}}| \\ge 0.35$",
+        f"- **Dynamic Target %**: $R_{{\\text{{target}}}} = |S_{{\\alpha}}| \\cdot \\sigma_{{60\\text{{m}}}} \\cdot \\sqrt{{15}}$ (bounded $[0.60\\%, 3.50\\%]$)",
+        f"- **Adaptive Ratchets**: Lock 30% of target at 50% progress, lock 60% of target at 80% progress",
         f"- **Total Portfolio Net Profit (10 Days)**: **+${total_net_profit:,.2f} USD**",
         f"- **Total Trades Executed**: {total_trades}",
         f"- **Average Win Rate**: **{avg_win_rate:.2f}%**",
@@ -356,8 +373,8 @@ def generate_markdown_report(results: list[dict], report_path: str = "ALPHA_MODE
         
     md_lines.extend([
         "",
-        "## Conclusion & Hackathon Deployment",
-        "The 10-day high-velocity engine recycles capital 2-5 times daily per coin, capturing intraday micro-squeeze expansions while managing downside risk via strict $1k short limits.",
+        "## Conclusion & Dynamic Target Validation",
+        "Dynamic Target % calculation adapts ratchet levels to each coin's volatility, locking in quick gains on fast movers while letting trends run on high-volatility expansions.",
         "",
         "*Report auto-generated by `scripts/backtest_alpha_model.py`.*"
     ])
@@ -370,7 +387,7 @@ def generate_markdown_report(results: list[dict], report_path: str = "ALPHA_MODE
 
 def main():
     print("================================================================================")
-    print("⚡ 10-DAY HIGH-VELOCITY ALPHA MODEL ($S_alpha$) LONG/SHORT BACKTEST ENGINE")
+    print("⚡ 10-DAY DYNAMIC EXPECTED TARGET ALPHA MODEL ($S_alpha$) BACKTEST ENGINE")
     print("================================================================================")
     
     results = []
