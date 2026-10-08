@@ -193,17 +193,28 @@ def process_largecap_sleeve(raw_data: dict[str, pd.DataFrame]):
                 record_last_exit_price(pair, latest_price)
                 continue
 
-            # Dynamic Trailing Profit Ratchet Check for Large-Caps
-            largecap_ratchets = getattr(config, "LARGECAP_TRAILING_RATCHETS", [])
-            highest_ratio = highest_price / max(1e-6, entry_price)
+            # Volatility-Adjusted Dynamic Trailing Profit Ratchet Check for Large-Caps
+            vol_24h = df[price_col].pct_change().rolling(1440, min_periods=30).std().iloc[-1]
+            if vol_24h is None or np.isnan(vol_24h) or vol_24h <= 0:
+                vol_24h = 0.001
+            vol_dist_pct = max(0.006, vol_24h * np.sqrt(1440))
+
+            highest_gain_pct = (highest_price - entry_price) / max(1e-6, entry_price)
             trailing_floor_price = 0.0
             active_tier_name = ""
 
-            for peak_mult, floor_mult in reversed(largecap_ratchets):
-                if highest_ratio >= peak_mult:
-                    trailing_floor_price = entry_price * floor_mult
-                    locked_net_pct = (floor_mult - 1.0020) * 100.0
-                    active_tier_name = f"+{(peak_mult - 1.0)*100:.2f}% Peak -> +{locked_net_pct:.2f}% Net Floor"
+            # Dynamic Tiers based on Volatility Distance
+            dynamic_tiers = [
+                (3.5 * vol_dist_pct, 2.8 * vol_dist_pct),
+                (2.0 * vol_dist_pct, 1.5 * vol_dist_pct),
+                (1.0 * vol_dist_pct, 0.7 * vol_dist_pct),
+                (0.5 * vol_dist_pct, max(0.0025, 0.3 * vol_dist_pct)),
+            ]
+
+            for peak_req, floor_lock in dynamic_tiers:
+                if highest_gain_pct >= peak_req:
+                    trailing_floor_price = entry_price * (1.0 + floor_lock)
+                    active_tier_name = f"+{peak_req*100:.2f}% Peak -> +{(floor_lock - 0.002)*100:.2f}% Net Floor"
                     break
 
             if trailing_floor_price > 0.0 and latest_price <= trailing_floor_price:
@@ -427,17 +438,28 @@ def process_midcap_sleeve(raw_data: dict[str, pd.DataFrame]):
                     record_cooldown(pair, hours=getattr(config, "POST_STOP_LOSS_COOLDOWN_HOURS", 2.0))
                     continue
 
-                # Dynamic Trailing Profit Ratchet Check for Mid-Caps
-                midcap_ratchets = getattr(config, "MIDCAP_TRAILING_RATCHETS", [])
-                highest_ratio = highest_price / max(1e-6, entry_price)
+                # Volatility-Adjusted Dynamic Trailing Profit Ratchet Check for Mid-Caps
+                vol_24h = df[price_col].pct_change().rolling(1440, min_periods=30).std().iloc[-1]
+                if vol_24h is None or np.isnan(vol_24h) or vol_24h <= 0:
+                    vol_24h = 0.001
+                vol_dist_pct = max(0.007, vol_24h * np.sqrt(1440))
+
+                highest_gain_pct = (highest_price - entry_price) / max(1e-6, entry_price)
                 trailing_floor_price = 0.0
                 active_tier_name = ""
 
-                for peak_mult, floor_mult in reversed(midcap_ratchets):
-                    if highest_ratio >= peak_mult:
-                        trailing_floor_price = entry_price * floor_mult
-                        locked_net_pct = (floor_mult - 1.0020) * 100.0
-                        active_tier_name = f"+{(peak_mult - 1.0)*100:.2f}% Peak -> +{locked_net_pct:.2f}% Net Floor"
+                # Dynamic Tiers based on Volatility Distance
+                dynamic_tiers = [
+                    (3.5 * vol_dist_pct, 2.8 * vol_dist_pct),
+                    (2.0 * vol_dist_pct, 1.5 * vol_dist_pct),
+                    (1.0 * vol_dist_pct, 0.7 * vol_dist_pct),
+                    (0.5 * vol_dist_pct, max(0.0025, 0.3 * vol_dist_pct)),
+                ]
+
+                for peak_req, floor_lock in dynamic_tiers:
+                    if highest_gain_pct >= peak_req:
+                        trailing_floor_price = entry_price * (1.0 + floor_lock)
+                        active_tier_name = f"+{peak_req*100:.2f}% Peak -> +{(floor_lock - 0.002)*100:.2f}% Net Floor"
                         break
 
                 if trailing_floor_price > 0.0 and latest_price <= trailing_floor_price:
