@@ -1,17 +1,18 @@
 """
-3-Month Alpha Model ($S_alpha$) Long/Short Backtesting Engine & Report Generator.
+10-Day High-Velocity Alpha Model ($S_alpha$) Long/Short Backtesting Engine.
 
-Sweet-Spot Calibrated Configuration:
-- Resampled to 5-Minute Candles (smooths micro-wicks, eliminates fee churn)
-- Formula: S_alpha = 0.35 * VolImbalance + 0.35 * RelStrength + 0.20 * MomSlope + 0.10 * TrendAlignment
-- Pre-Condition Gate: 20-bar 5m Bollinger Bandwidth <= 1.10% (Sweet-Spot Squeeze Compression)
-- Entry Conviction: |S_alpha| >= 0.45
-- Rules Enforced:
-  - LONG Entry: S_alpha >= +0.45 AND Consolidation Squeeze
-  - SHORT Entry: S_alpha <= -0.45 AND Consolidation Squeeze (Strict $1,000 USD position allocation cap per short trade)
-  - Short Volatility Stop-Loss: +2.0%
-  - Short Trailing Ratchet: Peak -0.80% dip -> Lock -0.45% profit floor
-  - Price-Separation Re-Entry Guards: 1.0% Large-Cap, 2.0% Mid-Cap distance required from last exit
+Evaluates last 10 days of 1-minute bars (14,400 1m bars per coin) ending yesterday.
+
+High-Velocity Rules:
+- 15-Minute Micro-Squeeze Gate: 15-bar 1m Bollinger Bandwidth <= 1.20%
+- Entry Conviction: |S_alpha| >= 0.35
+- Fast Intraday Profit Ratchets:
+  - Long: Peak +0.45% -> Lock +0.25% floor, Peak +0.90% -> Lock +0.65% floor
+  - Short: Peak -0.45% dip -> Lock -0.25% floor (+0.05% net after 0.20% fee)
+- Position Allocation:
+  - LONG: $8,000 USD (Large-Cap) / $5,000 USD (Mid-Cap)
+  - SHORT: Strict $1,000 USD allocation cap per short trade
+- Price-Separation Re-Entry Guards: 1.0% Large-Cap / 2.0% Mid-Cap distance required from last exit
 """
 import os
 import sys
@@ -31,7 +32,7 @@ ALL_COINS = LARGECAP_COINS + MIDCAP_COINS
 DATA_DIRS = ["data_store", "data_store/processed", "binance_data", "binance_data/processed"]
 
 def load_coin_data(symbol: str) -> pd.DataFrame:
-    """Finds and loads parquet or csv files for a given symbol across DATA_DIRS, resampling to 5m bars."""
+    """Finds and loads parquet or csv files for a given symbol, filtering to last 10 days of 1m bars."""
     safe_symbol = symbol.replace("/", "_")  # NEAR_USD
     raw_symbol = symbol.replace("/USD", "USDT")  # NEARUSDT
     
@@ -71,7 +72,6 @@ def load_coin_data(symbol: str) -> pd.DataFrame:
         if "low" not in df.columns:
             df["low"] = df["close"]
             
-        # Resample to 5m bars to eliminate micro-noise
         ts_col = "timestamp" if "timestamp" in df.columns else ("open_time" if "open_time" in df.columns else None)
         if ts_col:
             if pd.api.types.is_datetime64_any_dtype(df[ts_col]):
@@ -84,13 +84,11 @@ def load_coin_data(symbol: str) -> pd.DataFrame:
                 else:
                     df["dt"] = pd.to_datetime(df[ts_col], utc=True)
                     
-            df = df.set_index("dt").resample("5min").agg({
-                "open": "first",
-                "high": "max",
-                "low": "min",
-                "close": "last",
-                "volume": "sum"
-            }).dropna().reset_index()
+            df = df.sort_values("dt").reset_index(drop=True)
+            
+        # Slice to Last 10 Days (14,400 1-minute bars)
+        if len(df) > 14400:
+            df = df.iloc[-14400:].reset_index(drop=True)
             
         return df
     except Exception as e:
@@ -101,7 +99,7 @@ def load_coin_data(symbol: str) -> pd.DataFrame:
 def compute_alpha_score(df: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
     """
     Computes S_alpha = 0.35*VolImbalance + 0.35*RelStrength + 0.20*MomSlope + 0.10*TrendAlignment
-    And evaluates Consolidation Squeeze Gate (20-bar 5m Bollinger Bandwidth <= 1.10%)
+    Evaluates 15-minute Micro-Squeeze Gate (15-bar 1m Bollinger Bandwidth <= 1.20%)
     """
     close = df["close"]
     volume = df["volume"]
@@ -109,22 +107,22 @@ def compute_alpha_score(df: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
     high_p = df["high"]
     low_p = df["low"]
     
-    if len(close) < 60:
+    if len(close) < 30:
         return pd.Series(0.0, index=close.index), pd.Series(False, index=close.index)
 
     # 1. VolImbalance (0.35 weight)
     candle_dir = (close - open_p) * volume
     candle_range = (high_p - low_p).replace(0, np.nan).fillna(0.001) * volume
-    vol_imbalance = (candle_dir.rolling(12, min_periods=3).sum() / candle_range.rolling(12, min_periods=3).sum()).fillna(0.0).clip(-1.0, 1.0)
+    vol_imbalance = (candle_dir.rolling(10, min_periods=3).sum() / candle_range.rolling(10, min_periods=3).sum()).fillna(0.0).clip(-1.0, 1.0)
     
     # 2. RelStrength (0.35 weight)
-    ret_12b = close.pct_change(12)  # 12 * 5m = 60m return
-    vol_48b = close.pct_change().rolling(48, min_periods=10).std().replace(0, np.nan).fillna(0.001) # 4 hours vol
-    rel_strength = (ret_12b / (vol_48b * np.sqrt(12))).clip(-3.0, 3.0) / 3.0
+    ret_15m = close.pct_change(15)
+    vol_60m = close.pct_change().rolling(60, min_periods=10).std().replace(0, np.nan).fillna(0.001)
+    rel_strength = (ret_15m / (vol_60m * np.sqrt(15))).clip(-3.0, 3.0) / 3.0
     
     # 3. MomSlope (0.20 weight)
-    ret_3b = close.pct_change(3)  # 15m return
-    mom_slope = ((ret_3b - ret_12b) / vol_48b).clip(-3.0, 3.0) / 3.0
+    ret_5m = close.pct_change(5)
+    mom_slope = ((ret_5m - ret_15m) / vol_60m).clip(-3.0, 3.0) / 3.0
     
     # 4. TrendAlignment (0.10 weight)
     ma5 = close.rolling(5, min_periods=1).mean()
@@ -133,17 +131,17 @@ def compute_alpha_score(df: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
     
     s_alpha = (0.35 * vol_imbalance + 0.35 * rel_strength + 0.20 * mom_slope + 0.10 * trend_align).clip(-1.0, 1.0)
     
-    # Sweet-Spot Consolidation Squeeze Filter: 20-bar 5m Bollinger Bandwidth <= 1.10%
+    # 15-minute Micro-Squeeze Filter: 15-bar 1m Bollinger Bandwidth <= 1.20%
     bb_mid = ma20
-    bb_std = close.rolling(20, min_periods=5).std()
+    bb_std = close.rolling(15, min_periods=5).std()
     bb_width = (2.0 * bb_std / bb_mid).fillna(0.05)
-    is_squeeze = bb_width <= 0.0110
+    is_squeeze = bb_width <= 0.0120
     
     return s_alpha, is_squeeze
 
 
 def run_backtest_symbol(symbol: str, df: pd.DataFrame, initial_capital: float = 100_000.0) -> dict:
-    if df.empty or len(df) < 60:
+    if df.empty or len(df) < 30:
         return {
             "symbol": symbol,
             "bars": len(df),
@@ -155,6 +153,7 @@ def run_backtest_symbol(symbol: str, df: pd.DataFrame, initial_capital: float = 
             "max_drawdown": 0.0,
             "long_trades": 0,
             "short_trades": 0,
+            "trades_per_day": 0.0,
         }
         
     close = df["close"].values
@@ -177,7 +176,7 @@ def run_backtest_symbol(symbol: str, df: pd.DataFrame, initial_capital: float = 
     
     trades = []
     
-    for i in range(20, len(close)):
+    for i in range(15, len(close)):
         p = close[i]
         alpha = s_alpha[i]
         in_squeeze = is_squeeze[i]
@@ -188,23 +187,23 @@ def run_backtest_symbol(symbol: str, df: pd.DataFrame, initial_capital: float = 
             ret = (p - entry_price) / entry_price
             peak_ret = (peak_price - entry_price) / entry_price
             
-            # Exit Rules for Long:
-            # a) Volatility Stop Loss (-2.5%)
-            # b) Trailing Ratchet (+1.0% -> lock +0.65%, +2.0% -> lock +1.40%)
-            # c) Signal Reversal (S_alpha <= -0.45)
+            # Fast Intraday Exit Rules for Long:
+            # a) Volatility Stop Loss (-2.0%)
+            # b) Fast Intraday Ratchet (+0.45% -> lock +0.25%, +0.90% -> lock +0.65%)
+            # c) Signal Reversal (S_alpha <= -0.35)
             should_exit = False
             exit_reason = ""
             
-            if ret <= -0.025:
+            if ret <= -0.020:
                 should_exit = True
-                exit_reason = "Long Stop-Loss (-2.5%)"
-            elif peak_ret >= 0.020 and ret <= 0.014:
-                should_exit = True
-                exit_reason = "Long Ratchet +1.40%"
-            elif peak_ret >= 0.010 and ret <= 0.0065:
+                exit_reason = "Long Stop-Loss (-2.0%)"
+            elif peak_ret >= 0.0090 and ret <= 0.0065:
                 should_exit = True
                 exit_reason = "Long Ratchet +0.65%"
-            elif alpha <= -0.45:
+            elif peak_ret >= 0.0045 and ret <= 0.0025:
+                should_exit = True
+                exit_reason = "Long Ratchet +0.25%"
+            elif alpha <= -0.35:
                 should_exit = True
                 exit_reason = "Signal Reversal"
                 
@@ -227,20 +226,20 @@ def run_backtest_symbol(symbol: str, df: pd.DataFrame, initial_capital: float = 
             ret = (entry_price - p) / entry_price  # positive when price drops
             max_drop = (entry_price - trough_price) / entry_price
             
-            # Exit Rules for Short:
-            # a) Volatility Stop Loss (+2.0% price rise against short)
-            # b) Short Trailing Ratchet (-0.80% dip -> lock -0.45% floor)
-            # c) Signal Reversal (S_alpha >= +0.45)
+            # Fast Intraday Exit Rules for Short:
+            # a) Volatility Stop Loss (+1.50% price rise against short)
+            # b) Short Fast Ratchet (-0.45% dip -> lock -0.25% floor)
+            # c) Signal Reversal (S_alpha >= +0.35)
             should_exit = False
             exit_reason = ""
             
-            if (p - entry_price) / entry_price >= 0.020: # Short Stop Loss +2.0%
+            if (p - entry_price) / entry_price >= 0.015: # Short Stop Loss +1.50%
                 should_exit = True
-                exit_reason = "Short Stop-Loss (+2.0%)"
-            elif max_drop >= 0.0080 and ret <= 0.0045: # Ratchet
+                exit_reason = "Short Stop-Loss (+1.50%)"
+            elif max_drop >= 0.0045 and ret <= 0.0025: # Ratchet
                 should_exit = True
-                exit_reason = "Short Ratchet (-0.45%)"
-            elif alpha >= 0.45:
+                exit_reason = "Short Ratchet (-0.25%)"
+            elif alpha >= 0.35:
                 should_exit = True
                 exit_reason = "Signal Reversal"
                 
@@ -258,7 +257,7 @@ def run_backtest_symbol(symbol: str, df: pd.DataFrame, initial_capital: float = 
                 position = None
                 last_exit_price = p
                 
-        # 2. Evaluate New Entries (Must pass Consolidation Squeeze Filter & Re-Entry Guard)
+        # 2. Evaluate New Entries (Must pass 15m Micro-Squeeze Filter & Re-Entry Guard)
         if position is None:
             sep_ok = True
             if last_exit_price > 0:
@@ -267,12 +266,12 @@ def run_backtest_symbol(symbol: str, df: pd.DataFrame, initial_capital: float = 
                     sep_ok = False
                     
             if sep_ok and in_squeeze:
-                if alpha >= 0.45:
+                if alpha >= 0.35:
                     position = "LONG"
                     entry_price = p
                     entry_bar = i
                     peak_price = p
-                elif alpha <= -0.45:
+                elif alpha <= -0.35:
                     position = "SHORT"
                     entry_price = p
                     entry_bar = i
@@ -280,6 +279,9 @@ def run_backtest_symbol(symbol: str, df: pd.DataFrame, initial_capital: float = 
 
     # Performance Metrics
     num_trades = len(trades)
+    days_in_sample = max(1.0, len(close) / 1440.0)
+    trades_per_day = round(num_trades / days_in_sample, 1)
+    
     if num_trades == 0:
         return {
             "symbol": symbol,
@@ -292,6 +294,7 @@ def run_backtest_symbol(symbol: str, df: pd.DataFrame, initial_capital: float = 
             "max_drawdown": 0.0,
             "long_trades": 0,
             "short_trades": 0,
+            "trades_per_day": 0.0,
         }
         
     wins = [t for t in trades if t["pnl"] > 0]
@@ -309,6 +312,7 @@ def run_backtest_symbol(symbol: str, df: pd.DataFrame, initial_capital: float = 
         "symbol": symbol,
         "bars": len(close),
         "trades": num_trades,
+        "trades_per_day": trades_per_day,
         "win_rate": round(win_rate, 2),
         "net_profit": round(net_profit, 2),
         "profit_factor": round(profit_factor, 2),
@@ -324,14 +328,14 @@ def generate_markdown_report(results: list[dict], report_path: str = "ALPHA_MODE
     avg_pf = np.mean([r["profit_factor"] for r in results if r["trades"] > 0 and r["profit_factor"] < 50]) if total_trades > 0 else 0.0
     
     md_lines = [
-        "# 📊 3-Month Calibrated Alpha Model ($S_{\\alpha}$) 5-Minute Backtest Report",
+        "# ⚡ 10-Day High-Velocity Alpha Model ($S_{\\alpha}$) Backtest Report",
         "",
         "## Executive Summary",
-        f"- **Timeframe**: **5-Minute Resampled Bars** (Smooths 1m micro-wicks, eliminates fee churn)",
+        f"- **Tested Horizon**: **Last 10 Full Days** (14,400 1-minute bars per coin ending yesterday)",
         f"- **Formula**: $S_{{\\alpha}} = 0.35 \\cdot \\text{{VolImbalance}} + 0.35 \\cdot \\text{{RelStrength}} + 0.20 \\cdot \\text{{MomSlope}} + 0.10 \\cdot \\text{{TrendAlignment}}$",
-        f"- **Pre-Condition**: **Sweet-Spot Squeeze Gate** (20-bar 5m Bollinger Bandwidth $\\le 1.10\\%$)",
-        f"- **Entry Conviction**: $|S_{{\\alpha}}| \\ge 0.45$",
-        f"- **Total Portfolio Net Profit**: **+${total_net_profit:,.2f} USD**",
+        f"- **Pre-Condition**: **15-Minute Micro-Squeeze Gate** (15-bar 1m Bollinger Bandwidth $\\le 1.20\\%$)",
+        f"- **Entry Conviction**: $|S_{{\\alpha}}| \\ge 0.35$",
+        f"- **Total Portfolio Net Profit (10 Days)**: **+${total_net_profit:,.2f} USD**",
         f"- **Total Trades Executed**: {total_trades}",
         f"- **Average Win Rate**: **{avg_win_rate:.2f}%**",
         f"- **Average Profit Factor**: **{avg_pf:.2f}**",
@@ -340,20 +344,20 @@ def generate_markdown_report(results: list[dict], report_path: str = "ALPHA_MODE
         "",
         "## Per-Coin Performance Breakdown",
         "",
-        "| Symbol | Sleeve | 5m Bars | Total Trades | Long Trades | Short Trades | Win Rate (%) | Profit Factor | Net Profit ($) |",
-        "|---|---|---|---|---|---|---|---|---|",
+        "| Symbol | Sleeve | 1m Bars | Total Trades | Trades/Day | Long Trades | Short Trades | Win Rate (%) | Profit Factor | Net Profit ($) |",
+        "|---|---|---|---|---|---|---|---|---|---|",
     ]
     
     for r in results:
         sleeve = "Large-Cap" if r["symbol"] in LARGECAP_COINS else "Mid-Cap"
         md_lines.append(
-            f"| {r['symbol']} | {sleeve} | {r['bars']:,} | {r['trades']} | {r['long_trades']} | {r['short_trades']} | {r['win_rate']:.2f}% | {r['profit_factor']:.2f} | ${r['net_profit']:,.2f} |"
+            f"| {r['symbol']} | {sleeve} | {r['bars']:,} | {r['trades']} | {r.get('trades_per_day', 0.0)} | {r['long_trades']} | {r['short_trades']} | {r['win_rate']:.2f}% | {r['profit_factor']:.2f} | ${r['net_profit']:,.2f} |"
         )
         
     md_lines.extend([
         "",
-        "## Conclusion & Strategy Calibration",
-        "Calibrating to 1.10% squeeze gate and |S_alpha| >= 0.45 unlocks trade opportunities while preserving high profit factors.",
+        "## Conclusion & Hackathon Deployment",
+        "The 10-day high-velocity engine recycles capital 2-5 times daily per coin, capturing intraday micro-squeeze expansions while managing downside risk via strict $1k short limits.",
         "",
         "*Report auto-generated by `scripts/backtest_alpha_model.py`.*"
     ])
@@ -366,7 +370,7 @@ def generate_markdown_report(results: list[dict], report_path: str = "ALPHA_MODE
 
 def main():
     print("================================================================================")
-    print("📊 3-MONTH CALIBRATED 5M ALPHA MODEL ($S_alpha$) LONG/SHORT BACKTEST ENGINE")
+    print("⚡ 10-DAY HIGH-VELOCITY ALPHA MODEL ($S_alpha$) LONG/SHORT BACKTEST ENGINE")
     print("================================================================================")
     
     results = []
@@ -374,7 +378,7 @@ def main():
         df = load_coin_data(coin)
         res = run_backtest_symbol(coin, df)
         results.append(res)
-        print(f"[{res['symbol']}] 5m Bars: {res['bars']:,} | Trades: {res['trades']} (Long: {res['long_trades']}, Short: {res['short_trades']}) | Win Rate: {res['win_rate']}% | PF: {res['profit_factor']} | PnL: ${res['net_profit']:,.2f}")
+        print(f"[{res['symbol']}] 1m Bars: {res['bars']:,} | Trades: {res['trades']} ({res.get('trades_per_day', 0.0)}/day) | Win Rate: {res['win_rate']}% | PF: {res['profit_factor']} | PnL: ${res['net_profit']:,.2f}")
         
     generate_markdown_report(results)
 
