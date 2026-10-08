@@ -1,13 +1,15 @@
 """
 3-Month Alpha Model ($S_alpha$) Long/Short Backtesting Engine & Report Generator.
 
-Simulates Alpha Model breakout/breakdown signals over 3 months of 1-minute bars across 15 target coins:
-- 4 Large-Caps: NEAR/USD, ICP/USD, HBAR/USD, FIL/USD
-- 11 Mid-Caps: UNI/USD, AAVE/USD, CRV/USD, PENDLE/USD, CAKE/USD, ONDO/USD, ENA/USD, ARB/USD, POL/USD, SEI/USD, CFX/USD
+Formula Evaluated:
+S_alpha = 0.35 * VolImbalance + 0.35 * RelStrength + 0.20 * MomSlope + 0.10 * TrendAlignment
+
+Pre-Condition:
+Consolidation Squeeze Gate: 20-bar Bollinger Bandwidth <= 1.5%
 
 Rules Enforced:
-- LONG Entry: S_alpha >= +0.40
-- SHORT Entry: S_alpha <= -0.40 (Strict $1,000 USD position allocation cap per short trade)
+- LONG Entry: S_alpha >= +0.40 AND Consolidation Squeeze
+- SHORT Entry: S_alpha <= -0.40 AND Consolidation Squeeze (Strict $1,000 USD position allocation cap per short trade)
 - Short Volatility Stop-Loss: +1.50%
 - Short Trailing Ratchet: Peak -0.60% dip -> Lock -0.35% profit floor
 - Price-Separation Re-Entry Guards: 1.0% Large-Cap, 2.0% Mid-Cap distance required from last exit
@@ -52,8 +54,8 @@ def load_coin_data(symbol: str) -> pd.DataFrame:
         else:
             df = pd.read_csv(filepath)
             
-        # Standardize price column
-        if "last_price" in df.columns:
+        # Standardize price & volume columns
+        if "last_price" in df.columns and "close" not in df.columns:
             df["close"] = df["last_price"]
         elif "close" in df.columns:
             df["close"] = df["close"].astype(float)
@@ -69,35 +71,48 @@ def load_coin_data(symbol: str) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def compute_alpha_score(close_series: pd.Series) -> pd.Series:
+def compute_alpha_score(df: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
     """
-    Computes composite Alpha Score S_alpha in [-1.0, +1.0]:
-    - Z_mom: Multi-timeframe trend momentum (5m, 15m, 60m)
-    - Z_vol: Volatility compression breakout / squeeze indicator
+    Computes S_alpha = 0.35*VolImbalance + 0.35*RelStrength + 0.20*MomSlope + 0.10*TrendAlignment
+    And evaluates Consolidation Squeeze Gate (Bollinger Bandwidth <= 1.5%)
     """
-    if len(close_series) < 60:
-        return pd.Series(0.0, index=close_series.index)
-        
-    ret_5m = close_series.pct_change(5)
-    ret_15m = close_series.pct_change(15)
-    ret_60m = close_series.pct_change(60)
+    close = df["close"]
+    volume = df["volume"] if "volume" in df.columns else pd.Series(1.0, index=close.index)
+    open_p = df["open"] if "open" in df.columns else close.shift(1).fillna(close)
+    high_p = df["high"] if "high" in df.columns else close
+    low_p = df["low"] if "low" in df.columns else close
     
-    # Normalized momentum score
-    mom_composite = (0.5 * ret_5m + 0.3 * ret_15m + 0.2 * ret_60m)
-    vol_60m = close_series.pct_change().rolling(60, min_periods=10).std()
-    vol_60m = vol_60m.replace(0, np.nan).fillna(0.001)
+    if len(close) < 60:
+        return pd.Series(0.0, index=close.index), pd.Series(False, index=close.index)
+
+    # 1. VolImbalance (0.35 weight)
+    candle_dir = (close - open_p) * volume
+    candle_range = (high_p - low_p).replace(0, np.nan).fillna(0.001) * volume
+    vol_imbalance = (candle_dir.rolling(15, min_periods=5).sum() / candle_range.rolling(15, min_periods=5).sum()).fillna(0.0).clip(-1.0, 1.0)
     
-    z_mom = (mom_composite / (vol_60m * np.sqrt(15))).clip(-3.0, 3.0) / 3.0
+    # 2. RelStrength (0.35 weight)
+    ret_15m = close.pct_change(15)
+    vol_60m = close.pct_change().rolling(60, min_periods=10).std().replace(0, np.nan).fillna(0.001)
+    rel_strength = (ret_15m / (vol_60m * np.sqrt(15))).clip(-3.0, 3.0) / 3.0
     
-    # Volatility Squeeze / Expansion Score
-    high_20 = close_series.rolling(20, min_periods=5).max()
-    low_20 = close_series.rolling(20, min_periods=5).min()
-    range_ratio = (high_20 - low_20) / close_series
-    mean_range = range_ratio.rolling(60, min_periods=10).mean().replace(0, np.nan).fillna(0.01)
-    z_vol = ((range_ratio - mean_range) / mean_range).clip(-1.0, 1.0)
+    # 3. MomSlope (0.20 weight)
+    ret_5m = close.pct_change(5)
+    mom_slope = ((ret_5m - ret_15m) / vol_60m).clip(-3.0, 3.0) / 3.0
     
-    s_alpha = (0.7 * z_mom + 0.3 * z_vol).clip(-1.0, 1.0)
-    return s_alpha
+    # 4. TrendAlignment (0.10 weight)
+    ma5 = close.rolling(5, min_periods=1).mean()
+    ma20 = close.rolling(20, min_periods=5).mean()
+    trend_align = np.sign(ma5 - ma20) * ((ma5 - ma20).abs() / (ma20 * 0.005)).clip(0.0, 1.0)
+    
+    s_alpha = (0.35 * vol_imbalance + 0.35 * rel_strength + 0.20 * mom_slope + 0.10 * trend_align).clip(-1.0, 1.0)
+    
+    # Consolidation Squeeze Filter: 20-bar Bollinger Bandwidth <= 1.5%
+    bb_mid = ma20
+    bb_std = close.rolling(20, min_periods=5).std()
+    bb_width = (2.0 * bb_std / bb_mid).fillna(0.05)
+    is_squeeze = bb_width <= 0.015
+    
+    return s_alpha, is_squeeze
 
 
 def run_backtest_symbol(symbol: str, df: pd.DataFrame, initial_capital: float = 100_000.0) -> dict:
@@ -116,7 +131,9 @@ def run_backtest_symbol(symbol: str, df: pd.DataFrame, initial_capital: float = 
         }
         
     close = df["close"].values
-    s_alpha = compute_alpha_score(df["close"]).values
+    s_alpha_series, squeeze_series = compute_alpha_score(df)
+    s_alpha = s_alpha_series.values
+    is_squeeze = squeeze_series.values
     
     is_largecap = symbol in LARGECAP_COINS
     reentry_sep_pct = 0.0100 if is_largecap else 0.0200
@@ -136,6 +153,7 @@ def run_backtest_symbol(symbol: str, df: pd.DataFrame, initial_capital: float = 
     for i in range(60, len(close)):
         p = close[i]
         alpha = s_alpha[i]
+        in_squeeze = is_squeeze[i]
         
         # 1. Manage Active Position
         if position == "LONG":
@@ -152,7 +170,7 @@ def run_backtest_symbol(symbol: str, df: pd.DataFrame, initial_capital: float = 
             
             if ret <= -0.030:
                 should_exit = True
-                exit_reason = "Long Stop-Loss"
+                exit_reason = "Long Stop-Loss (-3.0%)"
             elif peak_ret >= 0.015 and ret <= 0.010:
                 should_exit = True
                 exit_reason = "Long Ratchet +1.0%"
@@ -213,16 +231,15 @@ def run_backtest_symbol(symbol: str, df: pd.DataFrame, initial_capital: float = 
                 position = None
                 last_exit_price = p
                 
-        # 2. Evaluate New Entries
+        # 2. Evaluate New Entries (Must pass Consolidation Squeeze Filter & Re-Entry Guard)
         if position is None:
-            # Enforce Price Separation Guard
             sep_ok = True
             if last_exit_price > 0:
                 dist = abs(p - last_exit_price) / last_exit_price
                 if dist < reentry_sep_pct:
                     sep_ok = False
                     
-            if sep_ok:
+            if sep_ok and in_squeeze:
                 if alpha >= 0.40:
                     position = "LONG"
                     entry_price = p
@@ -280,15 +297,17 @@ def generate_markdown_report(results: list[dict], report_path: str = "ALPHA_MODE
     avg_pf = np.mean([r["profit_factor"] for r in results if r["trades"] > 0 and r["profit_factor"] < 50]) if total_trades > 0 else 0.0
     
     md_lines = [
-        "# 📊 3-Month Alpha Model ($S_{\\alpha}$) Dual Long/Short Backtest Report",
+        "# 📊 3-Month Alpha Model ($S_{\\alpha}$) Consolidation Breakout/Breakdown Backtest Report",
         "",
         "## Executive Summary",
+        f"- **Formula**: $S_{{\\alpha}} = 0.35 \\cdot \\text{{VolImbalance}} + 0.35 \\cdot \\text{{RelStrength}} + 0.20 \\cdot \\text{{MomSlope}} + 0.10 \\cdot \\text{{TrendAlignment}}$",
+        f"- **Pre-Condition**: **Consolidation Squeeze Gate** (20-bar Bollinger Bandwidth $\\le 1.5\\%$)",
         f"- **Tested Horizon**: 3 Months (~130,000 1-minute bars per coin across 15 target coins)",
         f"- **Total Portfolio Net Profit**: **+${total_net_profit:,.2f} USD**",
         f"- **Total Trades Executed**: {total_trades}",
         f"- **Average Win Rate**: **{avg_win_rate:.2f}%**",
         f"- **Average Profit Factor**: **{avg_pf:.2f}**",
-        "- **Short Position Rule**: Capped at strict **$1,000 USD** allocation per short trade",
+        "- **Short Position Allocation**: Capped at strict **$1,000 USD** per short trade",
         "- **Re-Entry Protection**: 1.0% Large-Cap / 2.0% Mid-Cap Price Separation Guard",
         "",
         "## Per-Coin Performance Breakdown",
@@ -305,8 +324,8 @@ def generate_markdown_report(results: list[dict], report_path: str = "ALPHA_MODE
         
     md_lines.extend([
         "",
-        "## Conclusion & EC2 Validation",
-        "The Alpha Model ($S_{\\alpha}$) consolidation predictor effectively captures early breakout/breakdown expansions while managing downside risk via strict $1,000 USD short position limits and dynamic trailing ratchets.",
+        "## Conclusion & Strategy Calibration",
+        "Enforcing the pre-consolidation squeeze gate alongside asymmetric long ($5k/$8k) vs short ($1k) allocation ensures trades trigger exclusively at true low-volatility compression breakouts/breakdowns.",
         "",
         "*Report auto-generated by `scripts/backtest_alpha_model.py`.*"
     ])
@@ -319,7 +338,7 @@ def generate_markdown_report(results: list[dict], report_path: str = "ALPHA_MODE
 
 def main():
     print("================================================================================")
-    print("📊 3-MONTH ALPHA MODEL ($S_alpha$) LONG/SHORT BACKTEST ENGINE")
+    print("📊 3-MONTH CONSOLIDATION ALPHA MODEL ($S_alpha$) LONG/SHORT BACKTEST ENGINE")
     print("================================================================================")
     
     results = []
