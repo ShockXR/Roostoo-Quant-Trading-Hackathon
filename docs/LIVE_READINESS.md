@@ -21,7 +21,7 @@ What stands between `main` and a bot that trades autonomously on the competition
 - `--strategy midcap` runs the mid-cap sleeve (`midcap_live.py`): the two-lookback momentum blend at a 1.5% daily volatility target, 20% per coin, 70% gross, rebalanced once a day after 00:00 UTC.
 - Signals come from Binance's public hourly klines (`data/binance_live.py`, with `data-api.binance.vision` as a fallback host), so there is no warm-up after a restart. A test checks that live weights equal the backtest's weights for the same hour.
 - The latched 12% halt is replaced for this sleeve by a staged de-risk from the equity high-water mark: half size beyond a 3% drawdown, 30% beyond 6%. Size is never cut to zero, so the bot keeps trading every day. Cuts trade at once; size comes back only at the next daily rebalance and only if drawdown has recovered.
-- A restart restores holdings and rebalance state from `data_store/midcap_state.json` and catches up on a missed rebalance. A rebalance that cannot finish (for example repeated rejections) is abandoned after 15 cycles until the next day.
+- A restart restores holdings and rebalance state from `data_store/midcap_state.json` and catches up on a missed rebalance. A rebalance that cannot finish (for example repeated rejections) is abandoned after 30 cycles (`MIDCAP_MAX_REBALANCE_CYCLES`, 15 until Oct 10) until the next day.
 
 ## Done in phase 5 (checks run on 2026-10-05)
 
@@ -29,7 +29,7 @@ What stands between `main` and a bot that trades autonomously on the competition
   - Without the drawdown schedule the two agree almost exactly: +9.62% engine vs +9.68% backtest for Sep 1 - Oct 4, with 243 fills in both. Fill timing (2 minutes after the hour vs 5), the paper broker's fee and slippage, lot rounding and exposure checks make no material difference.
   - With the schedule they can diverge in a window where a de-risk fires, because the engine checks drawdown every minute and the backtest every hour, so cuts and re-entries land at different times. Across twelve 14-day windows (Apr 8 - Oct 5): mean gap -0.07%, worst +/-3.2%, in both directions. Mean 14-day return 2.1% (engine), 2.2% (backtest), 3.3% (no schedule); worst drawdown -4.7%, -4.8%, -6.9%. In other words the schedule costs roughly a third of the return for roughly two points less worst-case drawdown.
 - **Live order path against a fake exchange** (`tests/test_midcap_exchange.py`), through the real trader wrappers and rate limiter:
-  - A seven-coin rebalance finishes in about three minutes, never above 30 API calls in any minute; idle cycles use 4 calls.
+  - A seven-coin rebalance finishes in about three minutes, never above 30 API calls in any minute; idle cycles use 3 calls (ticker, balance, pending; the short-position read is skipped while `ALLOW_SHORTS` is off).
   - An order that fills but whose response is lost is reconciled on the next cycle with no duplicate buy.
   - A definitive rejection (`Success: false`) used to block every coin after it in the list; it is now logged and skipped, retried once, then given up for that rebalance (`MIDCAP_MAX_REJECTIONS_PER_PAIR`), and the other coins still trade.
   - A drawdown cut sells proportionally on the exchange, leaving positions inside the 1% no-trade band alone.
@@ -60,7 +60,7 @@ Not covered by anything run so far: the real signed endpoints (no competition ke
 - **Binance access.** The signal needs Binance's public API (FAQ Q16 allows other data APIs). If both hosts fail, the bot holds its positions and retries every minute; it does not trade on stale data.
 - **Ticker gaps.** On 2026-10-05, `TON/USD` and `OMNI/USD` were listed as tradable in `/v3/exchangeInfo` but absent from `/v3/ticker`. Neither is in the mid-cap list. A mid-cap pair missing from the ticker stops the cycle.
 - **Fees are unconfirmed.** `config.py` assumes 0.1% taker; the API documentation example shows 0.012%. Check the `fee` on the first live fills in `logs/events.jsonl`.
-- **Order throughput.** One ticker call per minute plus about 7 calls per order under the 30 per minute limit allows about 3 orders per minute, so a full rebalance takes a few minutes.
+- **Order throughput.** Each cycle uses 3 calls (ticker and one wallet read) and each order 5 (a wallet read before and after, plus the order; 7 with `ALLOW_SHORTS`) under the 30 per minute limit. A cycle's calls are still in the 60-second window when the next cycle starts, so cycles alternate between about 5 orders and none: about 2.5 orders per minute on average (1.5 with shorts on), at most 40 per rebalance (`MIDCAP_MAX_TRADES_PER_HOUR`). A seven-coin rebalance takes a few minutes; a 29-order switchover 11 (`tests/test_sleeves.py`, synthetic, 0.3 s per call).
 - **The majors runner (`--strategy model` and the rule strategies) is unchanged** and still uses the latched 12% halt and one-minute feature warm-up.
 
 ## Deploying

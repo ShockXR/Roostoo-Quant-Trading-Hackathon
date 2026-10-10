@@ -75,8 +75,19 @@ cp ~/roostoo_bot/.env .env        # competition keys; never commit this file
 mkdir -p logs data_store
 ```
 
-1. **Checks, while the old bot still runs** (read-only, no orders): the three commands under "Before switching the live bot" in `docs/SLEEVES.md`: trade review, backtest, paper start.
-2. **Live switch commit**: `DRY_RUN = False` in `main.py` and `LIVE_TRADING_ENABLED = True` in `config.py`, committed and pushed on its own, then `git pull` here.
+1. **Checks, while the old bot still runs** (read-only, no orders): the five steps under "Before switching the live bot" in `docs/SLEEVES.md`: trade review, backtest, paper start, drawdown-schedule comparison, and the wallet and signal check with the competition keys.
+2. **Live switch commit**, only if step 1 passes the go-live rule at the end of `docs/SLEEVES.md`. It is its own commit so the history shows when live trading started:
+
+```bash
+sed -i 's/^DRY_RUN = True/DRY_RUN = False/' main.py
+sed -i 's/^LIVE_TRADING_ENABLED = False/LIVE_TRADING_ENABLED = True/' config.py
+git diff                                   # exactly those two lines
+git commit -am "live: switch the three-sleeve book to live trading" && git push origin Shreyan
+```
+
+   If the instance has no GitHub push access, make the same commit on a laptop, push it, and `git pull` here.
+
+   Start with no `data_store/sleeves_live_state.json` (a fresh clone has none), so the drawdown high-water mark starts at the account's equity on the first live cycle.
 3. **Stop the old bot before starting the new one.** Two bots on one account would trade against each other.
 
 ```bash
@@ -106,7 +117,7 @@ python -m roostoo_bot.scripts.live_score --mode live    # use --mode paper befor
 tail -n 50 logs/bot.log
 ```
 
-Compare the composite with the Roostoo app leaderboard. Reading the app and logs is fine; stopping the bot or placing trades by hand is not. Remember the 8 active trading days requirement: `live_score` lists fills per day.
+Compare the composite with the Roostoo app leaderboard. If `bot.log` repeats `balance or pending orders require reconciliation` for more than a few minutes, Roostoo is holding an order open or a balance frozen: the bot will not trade until it clears and does not cancel orders itself; raise it with the organizers. Reading the app and logs is fine; stopping the bot or placing trades by hand is not. Remember the 8 active trading days requirement: `live_score` lists fills per day.
 
 ## Costs
 

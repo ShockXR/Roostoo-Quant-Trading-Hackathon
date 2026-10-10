@@ -139,6 +139,7 @@ python -m roostoo_bot.scripts.shadow_replay                    # history replaye
 ## Documentation
 
 - [docs/SLEEVES.md](docs/SLEEVES.md): the three-sleeve book, why the Oct 6-10 bot lost, what is and isn't tested
+- [docs/REDTEAM_2026-10-10.md](docs/REDTEAM_2026-10-10.md): adversarial review of the book before deployment, findings and fixes
 - [ROADMAP.md](ROADMAP.md): plan, phases and decisions
 - [docs/MIDCAP_RESEARCH.md](docs/MIDCAP_RESEARCH.md): strategy research and results
 - [docs/LIVE_READINESS.md](docs/LIVE_READINESS.md): what was verified and what remains before live trading
