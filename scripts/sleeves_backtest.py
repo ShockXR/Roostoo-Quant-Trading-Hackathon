@@ -80,6 +80,9 @@ def variants(panel):
         "mid sleeve alone": sleeves.backtest_weights(panel, config, only("mid")),
         "small sleeve alone": sleeves.backtest_weights(panel, config, only("small")),
         "mid sleeve, no BTC gate": sleeves.backtest_weights(panel, settings(SLEEVE_PARAMS=no_gate), only("mid")),
+        # The 17 coins blend_v10 was researched on, without the 5 thinner ones the old live bot traded.
+        "mid sleeve, researched 17 coins only": sleeves.backtest_weights(
+            panel, config, {**only("mid"), "mid": [p for p in pairs["mid"] if p in config.MIDCAP_PAIRS]}),
     }
     mid = pairs["mid"]
     sub = HourlyPanel(panel.signal[mid], panel.execution[mid], panel.volume[mid])

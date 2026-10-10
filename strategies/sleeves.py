@@ -139,6 +139,8 @@ def backtest_weights(panel, config, sleeve_pairs=None, scale=None):
         if multiplier != 1.:
             table = cap_sleeve(table * multiplier, sleeve_specs[sleeve])
         tables.append(table)
+    if not tables:  # every sleeve empty (e.g. a sleeve disabled in config): never rebalance
+        return pd.DataFrame(np.nan, index=panel.signal.index, columns=panel.signal.columns)
     weights = pd.concat(tables, axis=1).reindex(columns=panel.signal.columns)
     filled = weights.notna().any(axis=1)
     return weights.where(~filled, weights.fillna(0.), axis=0)

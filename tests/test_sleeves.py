@@ -129,8 +129,11 @@ class SleeveEngineTests(OfflineCase):
         super().setUp()
         self.weights = {"large": {"BTC/USD": .1, "ETH/USD": .1}, "mid": {"UNI/USD": .05}, "small": {"PEPE/USD": .02}}
         self.regime = True
+        self.signal_error = None
 
     def source(self, hour_ms, held=()):
+        if self.signal_error:
+            raise self.signal_error
         return {s: dict(w) for s, w in self.weights.items()}, self.regime
 
     def engine(self, broker=None, extra_pairs=()):
@@ -193,6 +196,23 @@ class SleeveEngineTests(OfflineCase):
         events = engine.step(self.quotes(free), free)
         self.assertIn(("PEPE/USD", "BUY"), {(e["pair"], e["action"]) for e in events})
 
+    def test_dust_left_by_a_small_cap_stop_does_not_fire_the_stop_again(self):
+        broker = PaperBroker(97_500.)
+        broker.state.longs["PEPE/USD"] = .7
+        broker.state.longs["PEPE/USD"] += .1  # 0.7999999999999999: the sale floors to 0.799999 and leaves 1e-6 behind
+        self.weights["small"] = {}
+        engine = self.engine(broker)
+        engine.rebalance.entries["PEPE/USD"] = 1000.
+        now = DAY0 + DAY + 3 * 60_000
+        events = engine.step(self.quotes(now, {"PEPE/USD": 880.}), now)
+        self.assertIn(("PEPE/USD", "SELL"), {(e["pair"], e["action"]) for e in events})
+        self.assertGreater(broker.state.longs.get("PEPE/USD", 0.), 0.)  # unsellable dust (below MiniOrder)
+        # After the 72h lockout, with PEPE still more than 10% below the old entry, the stop must not re-bar it.
+        later = now + 73 * HOUR
+        engine.step(self.quotes(later, {"PEPE/USD": 880.}), later)
+        self.assertLessEqual(engine.rebalance.blocked.get("PEPE/USD", 0), later)
+        self.assertNotIn("PEPE/USD", engine.rebalance.entries)
+
     def test_wide_spread_blocks_new_small_cap_entry(self):
         engine = self.engine()
         now = DAY0 + DAY + 3 * 60_000
@@ -231,6 +251,57 @@ class SleeveEngineTests(OfflineCase):
         later = evening + 60_000
         self.assertEqual(engine.step(self.quotes(later, drift), later), [])
 
+    def test_activity_trade_retried_next_cycle_after_a_refusal(self):
+        from roostoo_bot.execution.broker import OrderRejected
+        engine = self.engine(PaperBroker(97_500.))
+        now = DAY0 + DAY + 3 * 60_000
+        engine.step(self.quotes(now), now)
+        drift = {"BTC/USD": 10.3}
+        real, calls = engine.broker.submit, []
+
+        def refuse_first(order, quotes, metadata):
+            calls.append(order.pair)
+            if len(calls) == 1:
+                raise OrderRejected("transient refusal")
+            return real(order, quotes, metadata)
+        engine.broker.submit = refuse_first
+        morning = DAY0 + 2 * DAY + 3 * 60_000
+        self.assertEqual(engine.step(self.quotes(morning, drift), morning), [])  # rebalance: all inside the band
+        evening = DAY0 + 2 * DAY + config.ACTIVITY_HOUR_UTC * HOUR + 60_000
+        self.assertEqual(engine.step(self.quotes(evening, drift), evening), [])
+        later = evening + 60_000
+        events = engine.step(self.quotes(later, drift), later)
+        self.assertEqual([(e["pair"], e["action"]) for e in events], [("BTC/USD", "SELL")])
+
+    def test_activity_trade_prefers_a_sell_which_cash_and_exposure_checks_never_block(self):
+        engine = self.engine(PaperBroker(97_500.))
+        now = DAY0 + DAY + 3 * 60_000
+        engine.step(self.quotes(now), now)
+        # Both drifts are inside the 1% rebalance band; the BTC buy is the larger one.
+        drift = {"BTC/USD": 9.5, "ETH/USD": 10.3}
+        morning = DAY0 + 2 * DAY + 3 * 60_000
+        self.assertEqual(engine.step(self.quotes(morning, drift), morning), [])
+        evening = DAY0 + 2 * DAY + config.ACTIVITY_HOUR_UTC * HOUR + 60_000
+        events = engine.step(self.quotes(evening, drift), evening)
+        self.assertEqual([(e["pair"], e["action"]) for e in events], [("ETH/USD", "SELL")])
+
+    def test_every_utc_hkt_and_aedt_day_has_a_fill(self):
+        # The organizers' trading-day timezone is unknown (ORGANIZER_QUESTIONS.md). Day 1's rebalance is inside the
+        # band, so day 1 relies on the activity trade, which must land inside the UTC, UTC+8 and UTC+11 day 1.
+        engine = self.engine(PaperBroker(97_500.))
+        self.weights = {"large": {}, "mid": {"UNI/USD": .04, "AAVE/USD": .04}, "small": {}}
+        fills = []
+        for day in range(3):
+            if day == 2:
+                self.weights["mid"] = {"UNI/USD": .02, "AAVE/USD": .06}
+            for hour in range(24):
+                now = DAY0 + (1 + day) * DAY + hour * HOUR + 3 * 60_000
+                fills += [e["timestamp"] for e in engine.step(self.quotes(now, {"UNI/USD": 10.5} if day else {}), now)]
+        first = (DAY0 + DAY) // DAY
+        for offset in (0, 8, 11):
+            days = {(t + offset * HOUR) // DAY - first for t in fills}
+            self.assertTrue({0, 1, 2} <= days, f"UTC{offset:+d}: fills on days {sorted(days)}")
+
     def test_drawdown_schedule_still_cuts_at_once(self):
         engine = self.engine()
         now = DAY0 + DAY + 3 * 60_000
@@ -241,6 +312,41 @@ class SleeveEngineTests(OfflineCase):
         events = engine.step(self.quotes(later, crash), later)
         self.assertTrue(events and all(e["action"] == "SELL" for e in events))
         self.assertLess(engine.rebalance.scale, 1.)
+
+    def test_signal_failure_keeps_stops_derisk_and_activity_on_previous_targets(self):
+        engine = self.engine(PaperBroker(97_500.))
+        now = DAY0 + DAY + 3 * 60_000
+        engine.step(self.quotes(now), now)
+        yesterday = engine.rebalance.hour_ms
+        self.signal_error = ValueError("BTC/USD: no complete hourly history")  # Binance down or a kline gap
+        crash = {p: 6. for p in LARGE + MID}
+        crash["PEPE/USD"] = 8.9  # 11% below entry: the small-cap stop
+        next_day = DAY0 + 2 * DAY + 3 * 60_000
+        with self.assertLogs("sleeves", "ERROR"):
+            events = engine.step(self.quotes(next_day, crash), next_day)
+        self.assertEqual({e["action"] for e in events}, {"SELL"})
+        self.assertIn("PEPE/USD", {e["pair"] for e in events})
+        self.assertLess(engine.rebalance.scale, 1.)
+        self.assertEqual(engine.rebalance.hour_ms, yesterday)  # the fetch is retried next cycle
+        # Still down at the activity hour: the day gets its trade toward yesterday's targets.
+        evening = DAY0 + 3 * DAY + config.ACTIVITY_HOUR_UTC * HOUR + 60_000
+        with self.assertLogs("sleeves", "ERROR"):
+            self.assertEqual(len(engine.step(self.quotes(evening, {"BTC/USD": 9.}), evening)), 1)
+        self.signal_error = None
+        later = evening + 60_000
+        engine.step(self.quotes(later, {"BTC/USD": 9.}), later)
+        self.assertEqual(engine.rebalance.hour_ms, DAY0 + 3 * DAY)
+
+    def test_signal_failure_before_any_rebalance_trades_nothing(self):
+        # No earlier targets to hold: every holding would look like a leftover to sell.
+        broker = PaperBroker(80_000.)
+        broker.state.longs.update({"BTC/USD": 1000., "UNI/USD": 500.})
+        engine = self.engine(broker)
+        self.signal_error = ValueError("no kline source answered")
+        evening = DAY0 + DAY + 21 * HOUR
+        with self.assertRaises(ValueError):
+            engine.step(self.quotes(evening), evening)
+        self.assertEqual(broker.state.longs, {"BTC/USD": 1000., "UNI/USD": 500.})
 
     def test_state_round_trip(self):
         path = f"{self.temp.name}/sleeves_state.json"
@@ -279,6 +385,74 @@ class WalletLayoutTests(OfflineCase):
                 patch.object(trader, "get_short_positions", return_value={"Success": True, "Positions": []}):
             with self.assertRaises(Exception):
                 LiveBroker().snapshot(quotes)
+
+    def test_long_only_wallet_read_does_not_need_the_short_endpoint(self):
+        # /v6/short_positions has never been called on the competition account; a refusal must not stop a long-only bot.
+        quotes = {"BTC/USD": Quote(100., 99.9, 100.1, 0)}
+        wallet = {"Success": True, "SpotWallet": {"USD": {"Free": 500., "Frozen": 0.}, "BTC": {"Free": 2., "Frozen": 0.}}}
+        refused = {"Success": False, "ErrMsg": "short trading not enabled for this account"}
+        with patch.object(config, "LIVE_TRADING_ENABLED", True), \
+                patch.object(trader, "get_balance", return_value=wallet), \
+                patch.object(trader, "get_pending_count", return_value={"Success": True, "TotalPending": 0}), \
+                patch.object(trader, "get_short_positions", return_value=refused) as shorts:
+            snapshot = LiveBroker().snapshot(quotes)
+            self.assertEqual(snapshot.longs, {"BTC/USD": 2.})
+            shorts.assert_not_called()
+            with patch.object(config, "ALLOW_SHORTS", True), self.assertRaises(Exception):
+                LiveBroker().snapshot(quotes)  # with shorts enabled the check comes back
+
+    def test_long_only_order_needs_five_free_api_calls(self):
+        # Two wallet reads of two calls each (pre- and post-order) plus the order; seven with the short endpoint.
+        limiter = trader.RateLimiter(clock=lambda: 0.)
+        for _ in range(config.MAX_API_CALLS_PER_MINUTE - 5):
+            limiter.reserve()
+        with patch.object(config, "LIVE_TRADING_ENABLED", True), patch.object(trader, "_LIMITER", limiter):
+            self.assertTrue(LiveBroker().can_submit())
+            with patch.object(config, "ALLOW_SHORTS", True):
+                self.assertFalse(LiveBroker().can_submit())
+
+
+class SwitchoverThroughputTests(OfflineCase):
+    """Live order path with 0.3 s per API call, so one cycle's calls are still in the 60 s window when the next starts."""
+    OLD = [f"OLD{i}/USD" for i in range(16)]  # leftovers from the previous bot, outside every sleeve
+    BOOK = {"large": {f"NL{i}/USD": .1 for i in range(3)}, "mid": {f"NM{i}/USD": .03 for i in range(8)},
+            "small": {f"NS{i}/USD": .02 for i in range(2)}}
+
+    def run_switchover(self, minutes=40):
+        from . import test_midcap_exchange as fake
+        pairs = self.OLD + [p for w in self.BOOK.values() for p in w]
+        for patcher in (patch.dict(fake.PRICES, {p: 10. for p in pairs}), patch.dict(fake.PRECISION, {p: 6 for p in pairs})):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        clock, exchange = fake.FakeClock(), fake.FakeExchange(cash=57_500.)
+        exchange.wallet.update({p.split("/")[0]: 250. for p in self.OLD})  # 16 x $2,500
+
+        def slow_request(*args, **kwargs):
+            out = fake.FakeExchange.request(exchange, *args, **kwargs)
+            clock.now += .3
+            return out
+        book = {s: list(w) for s, w in self.BOOK.items()}
+        with patch.object(trader, "_request", slow_request), \
+                patch.object(trader, "_LIMITER", trader.RateLimiter(clock=clock)), \
+                patch.object(config, "LIVE_TRADING_ENABLED", True), patch("roostoo_bot.main.DRY_RUN", False):
+            engine = sleeves_live.SleeveEngine(LiveBroker(), metadata(pairs),
+                                               lambda hour, held=(): ({s: dict(w) for s, w in self.BOOK.items()}, True), book)
+            for minute in range(minutes):  # run_forever: a ticker poll and a step every 60 s
+                start, now = clock.now, DAY0 + DAY + 3 * 60_000 + minute * 60_000
+                trader._LIMITER.reserve()
+                clock.now += .3
+                engine.step({p: Quote(10., 9.999, 10.001, now - 1000) for p in pairs}, now)
+                clock.now = start + 60.
+        return exchange
+
+    def test_switchover_of_29_orders_finishes(self):
+        # 16 leftover sells + 13 buys. Shorts on: 7 calls per order, so only the higher cycle cap gets it done.
+        for allow_shorts in (False, True):
+            with self.subTest(allow_shorts=allow_shorts), patch.object(config, "ALLOW_SHORTS", allow_shorts):
+                exchange = self.run_switchover()
+                held = {c for c, q in exchange.wallet.items() if q > 0 and c != "USD"}
+                self.assertEqual(held, {p.split("/")[0] for w in self.BOOK.values() for p in w},
+                                 f"stopped after {len(exchange.orders)} orders")
 
 
 class TradeReviewTests(OfflineCase):
@@ -330,3 +504,21 @@ class SleevesBacktestScriptTests(OfflineCase):
         text = out.read_text()
         for name in ("sleeves (recovery sizing", "large sleeve alone", "previous blend_v10", "since Oct 04"):
             self.assertIn(name, text)
+
+
+    def test_backtest_runs_with_a_sleeve_disabled(self):
+        import sys
+        from roostoo_bot.scripts import sleeves_backtest as script
+        rng = np.random.default_rng(5)
+
+        def download(pair, start, end):
+            index = pd.date_range(start + pd.Timedelta(hours=1), end, freq="h")
+            return pd.DataFrame({"close": 10 * np.exp(np.cumsum(rng.normal(0, .006, len(index)))), "volume": 1e6},
+                                index=index)
+        out = Path(self.temp.name) / "report_no_small.md"
+        argv = ["x", "--start", "2026-09-01", "--end", "2026-10-09", "--out", str(out)]
+        pairs = {**config.SLEEVE_PAIRS, "small": []}
+        with patch.object(config, "SLEEVE_PAIRS", pairs), patch.object(script, "download", side_effect=download), \
+                patch.object(sys, "argv", argv), patch("builtins.print"):
+            script.main()
+        self.assertIn("small sleeve alone", out.read_text())

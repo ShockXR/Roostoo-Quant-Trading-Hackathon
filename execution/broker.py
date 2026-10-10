@@ -18,14 +18,16 @@ class LiveBroker:
             raise RuntimeError("Live trading is disabled in config; use PaperBroker")
 
     def can_submit(self):
-        # Pre-order balance/pending/short reads, one mutation, and the three
-        # post-order reconciliation reads must all fit in the current budget.
-        return trader._LIMITER.available() >= 7
+        # Pre-order wallet reads, one mutation, and the post-order reconciliation
+        # reads must all fit in the current budget: balance and pending twice, plus
+        # the short positions twice when shorts are enabled.
+        return trader._LIMITER.available() >= (7 if config.ALLOW_SHORTS else 5)
 
     def snapshot(self, quotes):
         balance = trader.get_balance()
         pending = trader.get_pending_count()
-        shorts = trader.get_short_positions()
+        # A long-only bot never depends on /v6/short_positions, which may be refused for these keys.
+        shorts = trader.get_short_positions() if config.ALLOW_SHORTS else {"Success": True, "Positions": []}
         if not balance or not balance.get("Success") or not pending or pending.get("TotalPending") != 0:
             raise UnknownOrderState("balance or pending orders require reconciliation")
         if not shorts or not shorts.get("Success") or not isinstance(shorts.get("Positions"), list):

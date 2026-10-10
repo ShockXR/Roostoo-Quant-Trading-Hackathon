@@ -170,10 +170,10 @@ MIDCAP_TARGET_DAILY_VOL = 0.015   # team decision 2026-10-05
 MIDCAP_REBALANCE_EVERY_HOURS = 24  # rebalance at 00:00 UTC
 MIDCAP_REBALANCE_DELAY_MS = 120_000  # wait for the hourly kline to close on Binance
 MIDCAP_REBALANCE_BAND = 0.01       # skip per-coin trades under 1% of equity (as in the backtest)
-MIDCAP_MAX_TRADES_PER_HOUR = 40    # replay peak was 19 in one hour; the API budget (about 3 orders/minute) binds first
+MIDCAP_MAX_TRADES_PER_HOUR = 40    # replay peak was 19 in one hour; at most 40 orders per rebalance (API budget: about 2.5 orders/minute)
 MAX_CLOCK_SKEW_MS = 10_000         # tolerated lead of the server clock over this machine's when judging quote age
 MIDCAP_MAX_REJECTIONS_PER_PAIR = 2   # stop retrying a pair the exchange refuses this often per rebalance
-MIDCAP_MAX_REBALANCE_CYCLES = 15   # give up on a rebalance that cannot finish (e.g. repeated rejections)
+MIDCAP_MAX_REBALANCE_CYCLES = 30   # give up on a rebalance that cannot finish (e.g. repeated rejections); every other cycle is starved by the API budget
 # Staged drawdown de-risk from the equity high-water mark: half size beyond 3%, 30% beyond 6%.
 # Never zero, so the bot keeps trading; size returns at the next daily rebalance once drawdown recovers.
 MIDCAP_DRAWDOWN_SCHEDULE = ((0.03, 0.5), (0.06, 0.3))
@@ -218,8 +218,9 @@ SMALL_STOP_LOSS = 0.10
 SMALL_STOP_LOCKOUT_HOURS = 72
 SMALL_MAX_ENTRY_SPREAD = 0.003
 # Activity: if nothing has filled by this UTC hour, trade the largest drift back to target
-# (deadband ACTIVITY_BAND) so every competition day has a strategy trade.
-ACTIVITY_HOUR_UTC = 20
+# (deadband ACTIVITY_BAND) so every competition day has a strategy trade. Before 13:00 UTC, so the
+# trade also lands in the same day if the organizers count days in HKT (UTC+8) or AEDT (UTC+11).
+ACTIVITY_HOUR_UTC = 12
 ACTIVITY_BAND = 0.001
 SLEEVES_STATE_PATH = "data_store/sleeves_state.json"
 SLEEVES_LIVE_STATE_PATH = "data_store/sleeves_live_state.json"

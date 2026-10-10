@@ -134,7 +134,7 @@ class MidcapExchangeTests(OfflineCase):
         for minute in range(10, 15):
             self.assertEqual(self.cycle(minute), [])
         self.assertEqual(len(self.exchange.orders), orders)
-        self.assertLessEqual(max(self.cycle_calls[-5:]), 4)  # idle cycles: ticker + balance + pending + shorts
+        self.assertLessEqual(max(self.cycle_calls[-5:]), 3)  # idle cycles: ticker + balance + pending (long only: no short read)
 
     def test_lost_order_response_is_reconciled_without_a_duplicate_buy(self):
         self.exchange.drop_response_for = "CCC/USD"

@@ -106,8 +106,17 @@ class SleeveEngine(MidcapEngine):
                 raise ValueError("stale/future quote; stop entire cycle")
         scale = drawdown_scale(equity / self.state.high_water - 1, config.MIDCAP_DRAWDOWN_SCHEDULE)
         hour = latest_rebalance_hour(now_ms, config.MIDCAP_REBALANCE_EVERY_HOURS, config.MIDCAP_REBALANCE_DELAY_MS)
+        signal = None
         if hour != r.hour_ms:
-            weights, regime = self.signal_source(hour, held)  # raises until Binance has the closed kline
+            try:
+                signal = self.signal_source(hour, held)  # raises until Binance has the closed kline
+            except Exception:
+                if not r.hour_ms:
+                    raise  # no earlier targets to hold: trade nothing
+                # Stops, de-risk and the activity trade carry on against the last targets; retried next cycle.
+                log.exception("signals for %s unavailable; holding the %s targets", hour, r.hour_ms)
+        if signal is not None:
+            weights, regime = signal
             push = equity > config.PUSH_MODE_EQUITY
             r = self.rebalance = SleeveState(hour, weights, scale, push, regime, done=False, entries=r.entries,
                                              blocked={p: t for p, t in r.blocked.items() if t > now_ms},
@@ -156,6 +165,9 @@ class SleeveEngine(MidcapEngine):
         for pair, quantity in snapshot.longs.items():
             if self.sleeve_of.get(pair) != SMALL or quantity <= 0 or pair not in quotes:
                 continue
+            if quantity * quotes[pair].bid <= self.metadata.get(pair, {}).get("MiniOrder", 1.):
+                r.entries.pop(pair, None)  # dust a stop sale leaves behind: unsellable (as in plan_orders), so flat
+                continue
             entry = r.entries.setdefault(pair, quotes[pair].price)  # unknown entry (e.g. after a switch): start now
             if quotes[pair].bid <= entry * (1 - config.SMALL_STOP_LOSS) and r.blocked.get(pair, 0) <= now_ms:
                 r.blocked[pair] = now_ms + config.SMALL_STOP_LOCKOUT_HOURS * HOUR_MS
@@ -187,13 +199,20 @@ class SleeveEngine(MidcapEngine):
             return []
         r.activity_day = today
         orders = plan_orders(targets, snapshot, quotes, self.metadata, min_fraction=config.ACTIVITY_BAND)
+        orders = [o for o in orders if r.rejections.get(o.pair, 0) < config.MIDCAP_MAX_REJECTIONS_PER_PAIR]
         if not orders:
             log.warning("activity check: book already on target, no strategy trade available today")
             return []
-        largest = max(orders, key=lambda o: o.amount * quotes[o.pair].price if o.action in {"BUY", "SELL"} else o.amount)
+        # A sell is never held back by the cash or exposure checks in submit_orders, so prefer one.
+        candidates = [o for o in orders if o.action == "SELL"] or orders
+        largest = max(candidates, key=lambda o: o.amount * quotes[o.pair].price if o.action in {"BUY", "SELL"} else o.amount)
         log.info("activity trade: %s %s toward target", largest.action, largest.pair)
         before = dict(snapshot.longs)
-        events = self.submit_orders([largest], targets, quotes, now_ms)
+        events = self.submit_orders([largest], targets, quotes, now_ms)  # an unconfirmed order raises: no retry today
+        for pair in self.rejected:
+            r.rejections[pair] = r.rejections.get(pair, 0) + 1
+        if not events:
+            r.activity_day = -1  # refused or held back: try again next cycle
         self.after_fills(r, events, before, now_ms)
         return events
 
