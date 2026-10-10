@@ -1,12 +1,22 @@
-# Roostoo mid-cap momentum bot
+# Roostoo three-sleeve momentum bot
 
-An autonomous, long-only trading bot for the Roostoo Quant Trading Hackathon. It trades 17 mid-cap cryptocurrencies on the Roostoo exchange API with a daily-rebalanced momentum strategy, sized for steady, low-drawdown returns because the competition score rewards risk-adjusted performance.
+An autonomous, long-only trading bot for the Roostoo Quant Trading Hackathon. It trades large-cap, mid-cap and a small slice of small-cap cryptocurrencies on the Roostoo exchange API with daily-rebalanced momentum strategies, sized for steady, low-drawdown returns because the competition score rewards risk-adjusted performance.
 
-**Status (2026-10-05, update before submission).** The strategy is implemented, unit-tested, backtested on Binance history and replayed through the live engine. It has run in paper mode against live prices. It is not yet placing real orders on the competition account: live trading is switched on by a separate, recorded commit after a paper run on the deployment instance (see [DEPLOYMENT.md](DEPLOYMENT.md) and [docs/LIVE_READINESS.md](docs/LIVE_READINESS.md)). Everything below about performance is historical simulation with assumed costs, not live results.
+**Status (2026-10-10, update before submission).** From Oct 6 to Oct 10 the competition account ran an earlier dual-sleeve bot from branch `main` (24h dip-buying on large caps, momentum with tight profit-takes on mid caps); it was about -2.5% at day 6. This branch replaces it with the three-sleeve book described below, run with `--strategy sleeves`. Why the old bot lost and what changed: [docs/SLEEVES.md](docs/SLEEVES.md). Switchover steps: [DEPLOYMENT.md](DEPLOYMENT.md) section 5a. Everything below about performance is historical simulation with assumed costs, not live results.
 
 ## Strategy overview
 
-**Idea.** Over horizons of one to seven days, mid-cap crypto assets that have recently outperformed tended to keep outperforming in our 2026 test data (cross-sectional momentum), while short-horizon reversal lost in every configuration we tried. The bot buys the strongest recent performers, weights them by inverse volatility, keeps total risk to a fixed daily-volatility target, and sits in cash when nothing is trending.
+One book, three sleeves with separate universes and risk budgets, rebalanced once a day after 00:00 UTC (details and evidence in [docs/SLEEVES.md](docs/SLEEVES.md)):
+
+| Sleeve | Signal | Budget (recovery mode) |
+|---|---|---|
+| Large caps (BTC, ETH, SOL, BNB, XRP, ADA, DOGE, LINK, AVAX, DOT, LTC, SUI) | Top 3 by 28-day return, held only while BTC is above its 100-day average | 0.8% daily-vol target, up to 35% of equity |
+| Mid caps (22 coins) | 24h/168h momentum blend described below; half size while BTC is below its 100-day average | 0.8% daily-vol target, up to 30% |
+| Small caps (10 memecoins and small alts) | Top 2 by 7-day return, confirmed by a positive 24h return, only while BTC is above its 100-day average; hard stop 10% below entry | 0.25% daily-vol target, up to 5% |
+
+Once equity is back above the $100k start, large- and mid-cap sizes step up (x1.5 and x1.25). The rest of this README describes the mid-cap sleeve's research and the shared engine, which the book runs on.
+
+**Mid-cap idea.** Over horizons of one to seven days, mid-cap crypto assets that have recently outperformed tended to keep outperforming in our 2026 test data (cross-sectional momentum), while short-horizon reversal lost in every configuration we tried. The sleeve buys the strongest recent performers, weights them by inverse volatility, keeps risk to a daily-volatility target, and sits in cash when nothing is trending.
 
 **Scoring context.** Competition score = `0.4 * Sortino + 0.3 * Sharpe + 0.3 * Calmar`, with Sharpe sampled daily. All three penalize losing days and drawdown, so the design favors small, diversified, volatility-targeted positions over maximum return. Details of how we compute the score locally are in [scoring.py](scoring.py).
 
@@ -32,6 +42,8 @@ Binance public klines (1h)          Roostoo API (/v3/ticker, /v3/balance, /v3/pl
 
 | Component | File |
 |---|---|
+| Three-sleeve book: sleeve signals and sizing | [strategies/sleeves.py](strategies/sleeves.py) |
+| Three-sleeve live/paper runner: small-cap stops, activity trade, recovery/push mode | [sleeves_live.py](sleeves_live.py) |
 | Strategy: momentum signals, volatility target, caps, overlays | [strategies/midcap.py](strategies/midcap.py) |
 | Live/paper runner: schedule, drawdown de-risk, state | [midcap_live.py](midcap_live.py) |
 | Engine shared with the earlier runner: reconcile, order loop, persistence | [main.py](main.py) |
@@ -45,7 +57,9 @@ Binance public klines (1h)          Roostoo API (/v3/ticker, /v3/balance, /v3/pl
 
 Tech stack: Python 3.10+, pandas, numpy, requests; Binance public market data; designed to run on AWS EC2 (Sydney) under systemd. The repository also holds an earlier model-based pipeline for large-cap coins (`features/`, `model/`, `--strategy model`); the mid-cap strategy does not use it. It is described in [docs/OFFLINE_VALIDATION.md](docs/OFFLINE_VALIDATION.md).
 
-## Strategy in detail
+## Mid-cap sleeve in detail (research configuration)
+
+As researched and first deployed on its own. In the three-sleeve book the same signal runs on 22 coins with the smaller budget in the table above; the drawdown schedule and order safety below apply to the whole book.
 
 **Universe (17 pairs).** ENA, FET, WLD, UNI, TAO, ONDO, AAVE, VIRTUAL, HBAR, ARB, ICP, FIL, SEI, APT, ASTER, XLM, PUMP (all `/USD` on Roostoo). Chosen from the Roostoo pairs by 24h volume and bid/ask spread on 2026-10-05: about $8-53M of 24h volume on Roostoo and spreads under 5bp. BTC, ETH, memecoins, thinly traded pairs and tokenized stocks are excluded. The list was picked with knowledge of today's volumes, which flatters historical tests slightly.
 
@@ -71,6 +85,8 @@ A coin only qualifies if its return over the lookback is positive; if fewer than
 - Shorting is not used (permission on our keys is unconfirmed, and long/short momentum tested worse).
 
 ## Results (historical simulation, not live)
+
+Mid-cap sleeve on its own, at its research configuration. Results for the large-cap signal are in `MODEL_RESEARCH_REPORT.md` on branch `live-readiness`; `scripts/sleeves_backtest.py` scores the whole book.
 
 Data: Binance spot 1-minute candles for the 17 coins, 2026-04-01 to 2026-10-04, resampled to hourly. Backtests start flat with $100k, use the costs above, and score fresh 14-day windows the length of the competition. A test confirms strategy weights at any hour are unchanged when later data is removed (no look-ahead). Full method and caveats: [docs/MIDCAP_RESEARCH.md](docs/MIDCAP_RESEARCH.md).
 
@@ -98,7 +114,7 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt          # installs the package in editable mode
 cp .env.example .env                     # add ROOSTOO_API_KEY and ROOSTOO_API_SECRET (live only)
 python -m unittest discover -s tests -t . -v      # offline tests, no network, no orders
-python -m roostoo_bot.main --strategy midcap      # paper mode (default): public ticker, simulated fills
+python -m roostoo_bot.main --strategy sleeves     # paper mode (default): public ticker, simulated fills
 ```
 
 Paper mode needs no keys and never sends orders. Live trading needs two deliberate code changes (`DRY_RUN = False` in `main.py`, `LIVE_TRADING_ENABLED = True` in `config.py`) plus the competition keys. Deployment on EC2, the pre-live checklist and daily operation are in [DEPLOYMENT.md](DEPLOYMENT.md).
@@ -122,6 +138,7 @@ python -m roostoo_bot.scripts.shadow_replay                    # history replaye
 
 ## Documentation
 
+- [docs/SLEEVES.md](docs/SLEEVES.md): the three-sleeve book, why the Oct 6-10 bot lost, what is and isn't tested
 - [ROADMAP.md](ROADMAP.md): plan, phases and decisions
 - [docs/MIDCAP_RESEARCH.md](docs/MIDCAP_RESEARCH.md): strategy research and results
 - [docs/LIVE_READINESS.md](docs/LIVE_READINESS.md): what was verified and what remains before live trading

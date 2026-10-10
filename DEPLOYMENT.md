@@ -55,20 +55,46 @@ sudo ./deploy/install_service.sh          # systemd service: restarts on crash a
 tail -f logs/bot.log
 ```
 
-`./deploy/install_service.sh --print` shows the unit without installing it. If you prefer tmux (guide section 6), run `python -m roostoo_bot.main --strategy midcap` inside a tmux session instead; unlike the service it does not survive a reboot.
+`./deploy/install_service.sh --print` shows the unit without installing it. If you prefer tmux (guide section 6), run `python -m roostoo_bot.main --strategy sleeves` inside a tmux session instead; unlike the service it does not survive a reboot.
 
-State lives in `data_store/` (`midcap_state.json` in paper mode, `midcap_live_state.json` in live mode) and logs in `logs/` (`bot.log`, `events.jsonl` with every fill, `equity.jsonl` with one equity mark per minute). A restart resumes from the state file without re-buying.
+State lives in `data_store/` (`sleeves_state.json` in paper mode, `sleeves_live_state.json` in live mode) and logs in `logs/` (`bot.log`, `events.jsonl` with every fill, `equity.jsonl` with one equity mark per minute). A restart resumes from the state file without re-buying.
 
 ## 5. Going live
 
 Do this only after a paper run has covered a 00:00 UTC rebalance and the checklist in `docs/LIVE_READINESS.md` is complete. Going live is its own commit that sets `DRY_RUN = False` in `main.py` and `LIVE_TRADING_ENABLED = True` in `config.py`, so the history shows when it happened. Then put the competition keys in `.env`, `git pull`, and `sudo systemctl restart roostoo-bot`. Live uses its own state file.
+
+## 5a. Switching from the `main` dual-sleeve bot to the three-sleeve book (Oct 10)
+
+The instance runs the dual-sleeve bot from `main` (service `roostoo-bot`, repository `~/roostoo_bot`, started in `/home/ubuntu`). The three-sleeve book is on branch `Shreyan`; see [docs/SLEEVES.md](docs/SLEEVES.md). Install it next to the old one so the old bot's logs stay where they are.
+
+```bash
+git clone -b Shreyan https://github.com/ShockXR/Roostoo-Quant-Trading-Hackathon ~/sleeves_bot
+cd ~/sleeves_bot
+python3.11 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
+cp ~/roostoo_bot/.env .env        # competition keys; never commit this file
+mkdir -p logs data_store
+```
+
+1. **Checks, while the old bot still runs** (read-only, no orders): the three commands under "Before switching the live bot" in `docs/SLEEVES.md`: trade review, backtest, paper start.
+2. **Live switch commit**: `DRY_RUN = False` in `main.py` and `LIVE_TRADING_ENABLED = True` in `config.py`, committed and pushed on its own, then `git pull` here.
+3. **Stop the old bot before starting the new one.** Two bots on one account would trade against each other.
+
+```bash
+sudo systemctl stop roostoo-bot
+sudo ./deploy/install_service.sh          # replaces the unit: runs --strategy sleeves from ~/sleeves_bot
+tail -f logs/bot.log                      # expect "Starting three-sleeve book in live mode", then a rebalance line
+```
+
+At start the bot runs the day's rebalance at once: holdings in a sleeve are kept, resized or sold by that sleeve's signal, and coins outside every sleeve are sold. Its drawdown high-water mark starts at the equity on that first cycle. State: `data_store/sleeves_live_state.json`.
+
+Roll back by stopping `roostoo-bot`, restoring the old unit (`ExecStart=/home/ubuntu/roostoo_bot/.venv/bin/python -m roostoo_bot.main`, `WorkingDirectory=/home/ubuntu`) and starting it again.
 
 ## 6. Changing the strategy during the competition
 
 ```bash
 # on your machine: commit with a clear message and push
 # on the instance:
-cd ~/roostoo_bot_repo && git pull && sudo systemctl restart roostoo-bot
+cd ~/sleeves_bot && git pull && sudo systemctl restart roostoo-bot   # the repository the service runs from
 ```
 
 Keep each change in its own commit; the organizers use the history to check the bot ran autonomously.
