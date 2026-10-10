@@ -229,10 +229,21 @@ def main():
     parser.add_argument("--state", default=None, help="state file (default depends on --strategy)")
     parser.add_argument("--events", default=config.EVENT_LOG_PATH)
     parser.add_argument("--equity", default=config.EQUITY_LOG_PATH)
-    parser.add_argument("--strategy", choices=["midcap", "model", "momentum", "mean_reversion", "cross_sectional"],
+    parser.add_argument("--strategy", choices=["sleeves", "midcap", "model", "momentum", "mean_reversion", "cross_sectional"],
                         default="model")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s", force=True)
+    if args.strategy == "sleeves":
+        from . import sleeves_live
+        info = get_exchange_info()
+        if not info or not info.get("IsRunning"):
+            parser.error("exchange metadata unavailable/not running")
+        engine = sleeves_live.build(info["TradePairs"], live=not DRY_RUN,
+                                    state_path=args.state or (config.SLEEVES_STATE_PATH if DRY_RUN else config.SLEEVES_LIVE_STATE_PATH),
+                                    event_path=args.events, equity_path=args.equity)
+        log.info("Starting three-sleeve book in %s mode", "paper" if DRY_RUN else "live")
+        sleeves_live.run_forever(engine)
+        return
     if args.strategy == "midcap":
         from . import midcap_live
         info = get_exchange_info()

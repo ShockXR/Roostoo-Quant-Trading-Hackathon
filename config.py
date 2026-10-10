@@ -181,3 +181,45 @@ MIDCAP_HISTORY_HOURS = 400         # hourly closes fetched for signals (needs at
 MIDCAP_STATE_PATH = "data_store/midcap_state.json"
 MIDCAP_LIVE_STATE_PATH = "data_store/midcap_live_state.json"  # live and paper state never share a file
 BINANCE_KLINE_URLS = ("https://api.binance.com/api/v3/klines", "https://data-api.binance.vision/api/v3/klines")
+
+# --- Three-sleeve book (docs/SLEEVES.md; runs with --strategy sleeves) ---
+# Disjoint universes. Large and mid include every coin the Oct 6-9 live bot traded, so
+# today's holdings are re-scored by the new signals instead of being dumped unexamined.
+SLEEVE_PAIRS = {
+    "large": ["BTC/USD", "ETH/USD", "SOL/USD", "BNB/USD", "XRP/USD", "ADA/USD",
+              "DOGE/USD", "LINK/USD", "AVAX/USD", "DOT/USD", "LTC/USD", "SUI/USD"],
+    "mid": ["UNI/USD", "AAVE/USD", "CRV/USD", "PENDLE/USD", "CAKE/USD", "ONDO/USD", "ENA/USD", "ARB/USD",
+            "POL/USD", "SEI/USD", "CFX/USD", "FET/USD", "WLD/USD", "TAO/USD", "VIRTUAL/USD", "HBAR/USD",
+            "ICP/USD", "FIL/USD", "APT/USD", "ASTER/USD", "XLM/USD", "PUMP/USD"],
+    "small": ["PEPE/USD", "SHIB/USD", "BONK/USD", "WIF/USD", "FLOKI/USD", "PENGU/USD", "TRUMP/USD",
+              "1000CHEEMS/USD", "EIGEN/USD", "BIO/USD"],
+}
+# Budgets in recovery mode (equity below PUSH_MODE_EQUITY). Sum of gross caps = 70%.
+SLEEVE_PARAMS = {
+    "large": {"target_daily_vol": 0.008, "max_gross": 0.35, "max_weight": 0.15, "regime_off_scale": 0.0},
+    "mid": {"target_daily_vol": 0.008, "max_gross": 0.30, "max_weight": 0.08, "regime_off_scale": 0.5},
+    "small": {"target_daily_vol": 0.0025, "max_gross": 0.05, "max_weight": 0.02, "regime_off_scale": 0.0},
+}
+LARGE_LOOKBACK_HOURS = 28 * 24   # Model 3: 28-day momentum
+LARGE_TOP_K = 3
+REGIME_SMA_HOURS = 100 * 24      # BTC above its 100-day average = risk on
+SMALL_LOOKBACK_HOURS = 168
+SMALL_CONFIRM_HOURS = 24
+SMALL_TOP_K = 2
+SLEEVE_HISTORY_HOURS = {"large": REGIME_SMA_HOURS + 100, "mid": 400, "small": 400}
+# Push mode: once equity is back above the starting capital at a daily rebalance,
+# large and mid exposure is multiplied (caps still apply). Decided once a day, so it
+# does not flap around the threshold.
+PUSH_MODE_EQUITY = 100_000.0
+PUSH_MULTIPLIER = {"large": 1.5, "mid": 1.25, "small": 1.0}
+# Small-cap guards: hard stop from the average entry price (checked every minute),
+# a lockout after a stop, and no new small-cap entry through a wide Roostoo spread.
+SMALL_STOP_LOSS = 0.10
+SMALL_STOP_LOCKOUT_HOURS = 72
+SMALL_MAX_ENTRY_SPREAD = 0.003
+# Activity: if nothing has filled by this UTC hour, trade the largest drift back to target
+# (deadband ACTIVITY_BAND) so every competition day has a strategy trade.
+ACTIVITY_HOUR_UTC = 20
+ACTIVITY_BAND = 0.001
+SLEEVES_STATE_PATH = "data_store/sleeves_state.json"
+SLEEVES_LIVE_STATE_PATH = "data_store/sleeves_live_state.json"

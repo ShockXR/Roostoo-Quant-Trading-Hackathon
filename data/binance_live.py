@@ -64,3 +64,46 @@ def hourly_panel(pairs, end_hour_ms, hours=None, session=requests):
     volume = pd.DataFrame(volumes).sort_index()
     volume.index = signal.index
     return HourlyPanel(signal, signal.copy(), volume[signal.columns])
+
+
+def fetch_history(symbol, end_hour_ms, hours, session=requests):
+    """Hourly klines ending at end_hour_ms, paging backwards past Binance's 1000-row limit."""
+    rows, end = [], end_hour_ms
+    while len(rows) < hours:
+        batch = fetch_klines(symbol, end, min(1000, hours - len(rows)), session)
+        batch = [r for r in batch if int(r[0]) + HOUR_MS <= end]
+        if not batch:
+            break
+        rows = batch + rows
+        end = int(batch[0][0])
+    return rows[-hours:]
+
+
+def tolerant_panel(pairs, end_hour_ms, hours, required=(), session=requests):
+    """HourlyPanel of the pairs with complete, gap-free history ending at end_hour_ms.
+
+    A pair whose klines are missing, short or gapped is dropped with a warning,
+    unless it is in `required` (e.g. currently held), in which case this raises
+    so the caller holds and retries rather than trading on partial data.
+    """
+    if end_hour_ms % HOUR_MS:
+        raise ValueError("end_hour_ms must be on the hour")
+    expected = list(range(end_hour_ms - (hours - 1) * HOUR_MS, end_hour_ms + 1, HOUR_MS))
+    closes, volumes = {}, {}
+    for pair in pairs:
+        try:
+            rows = fetch_history(binance_symbol(pair), end_hour_ms, hours, session)
+            stamps = [int(r[0]) + HOUR_MS for r in rows]
+            if stamps != expected:
+                raise ValueError(f"{len(stamps)} of {hours} hours or a gap")
+        except ValueError as exc:
+            if pair in required:
+                raise ValueError(f"{pair}: no complete hourly history ({exc})") from exc
+            log.warning("%s dropped from this rebalance: %s", pair, exc)
+            continue
+        closes[pair] = [float(r[4]) for r in rows]
+        volumes[pair] = [float(r[7]) for r in rows]
+    index = pd.to_datetime(expected, unit="ms", utc=True)
+    signal = pd.DataFrame(closes, index=index, columns=list(closes))
+    volume = pd.DataFrame(volumes, index=index, columns=list(closes))
+    return HourlyPanel(signal, signal.copy(), volume)

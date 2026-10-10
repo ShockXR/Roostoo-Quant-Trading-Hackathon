@@ -1,6 +1,6 @@
 # Template: deploy/install_service.sh substitutes the user and repository path placeholders and installs it.
 [Unit]
-Description=Roostoo mid-cap trading bot
+Description=Roostoo three-sleeve trading bot
 After=network-online.target
 Wants=network-online.target
 
@@ -9,7 +9,7 @@ Type=simple
 User=__USER__
 WorkingDirectory=__REPO__
 EnvironmentFile=__REPO__/.env
-ExecStart=__REPO__/.venv/bin/python -m roostoo_bot.main --strategy midcap
+ExecStart=__REPO__/.venv/bin/python -m roostoo_bot.main --strategy sleeves
 Restart=always
 RestartSec=10
 StandardOutput=append:__REPO__/logs/bot.log
