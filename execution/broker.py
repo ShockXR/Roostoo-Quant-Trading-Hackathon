@@ -30,8 +30,11 @@ class LiveBroker:
             raise UnknownOrderState("balance or pending orders require reconciliation")
         if not shorts or not shorts.get("Success") or not isinstance(shorts.get("Positions"), list):
             raise UnknownOrderState("short position state unavailable")
-        wallet = balance["Wallet"]
-        if any(float(v.get("Lock", 0)) != 0 for v in wallet.values()):
+        # The bot that traded on main read SpotWallet/Frozen; the API docs show Wallet/Lock. Accept both.
+        wallet = balance.get("SpotWallet") or balance.get("Wallet")
+        if not isinstance(wallet, dict) or "USD" not in wallet:
+            raise UnknownOrderState("balance response has no wallet")
+        if any(float(v.get("Lock", 0) or 0) != 0 or float(v.get("Frozen", 0) or 0) != 0 for v in wallet.values()):
             raise UnknownOrderState("locked balances require reconciliation")
         cash = float(wallet["USD"]["Free"])
         longs = {}
@@ -63,7 +66,8 @@ class LiveBroker:
             response = trader.place_order(order.pair, order.action, order.amount)
             if response and response.get("Success"):
                 detail = response.get("OrderDetail", {})
-                if detail.get("Status") == "FILLED" and float(detail.get("FilledQuantity", 0)) == order.amount:
+                filled = float(detail.get("FilledQuantity", 0))
+                if detail.get("Status") == "FILLED" and abs(filled - order.amount) <= 1e-9 * max(1., order.amount):
                     return {"pair": order.pair, "action": order.action, "quantity": order.amount,
                             "price": float(detail["FilledAverPrice"]), "fee": float(detail.get("CommissionChargeValue", 0)),
                             "order_id": detail["OrderID"], "status": "FILLED", "paper": False}
