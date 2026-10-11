@@ -19,12 +19,14 @@ try:
     import config, costs, sizing, strategy
     from data.collector import poll_once
     from data.store import load_all
+    from data.regime import is_btc_regime_on, get_largecap_leaders, get_smallcap_leaders
     from execution.trader import place_order, get_balance
     from strategies.midcap import get_top_midcap_leaders
 except ImportError:
     from . import config, costs, sizing, strategy
     from .data.collector import poll_once
     from .data.store import load_all
+    from .data.regime import is_btc_regime_on, get_largecap_leaders, get_smallcap_leaders
     from .execution.trader import place_order, get_balance
     from .strategies.midcap import get_top_midcap_leaders
 
@@ -120,13 +122,25 @@ def adopt_wallet_holdings(raw_data: dict[str, pd.DataFrame]):
                 else:
                     vol_24h = 0.001
 
-                sleeve = "largecap" if pair in getattr(config, "LARGECAP_UNIVERSE", []) else "midcap"
-                sl_k = getattr(config, "STOP_LOSS_K", 3.0) if sleeve == "largecap" else getattr(config, "MIDCAP_STOP_LOSS_K", 3.5)
-                tp_k = getattr(config, "TAKE_PROFIT_K", 1.5) if sleeve == "largecap" else getattr(config, "MIDCAP_TAKE_PROFIT_K", 2.0)
+                if pair in getattr(config, "LARGECAP_UNIVERSE", []):
+                    sleeve = "largecap"
+                    sl_k = getattr(config, "STOP_LOSS_K", 3.0)
+                    tp_k = getattr(config, "TAKE_PROFIT_K", 1.5)
+                elif pair in getattr(config, "SMALLCAP_UNIVERSE", []):
+                    sleeve = "smallcap"
+                    sl_k = 0.0  # uses hard stop 10%
+                    tp_k = 2.0
+                else:
+                    sleeve = "midcap"
+                    sl_k = getattr(config, "MIDCAP_STOP_LOSS_K", 3.5)
+                    tp_k = getattr(config, "MIDCAP_TAKE_PROFIT_K", 2.0)
 
                 true_entry_p = get_true_entry_price(pair, fallback_price=latest_p)
                 vol_dist = latest_p * vol_24h * np.sqrt(1440)
-                stop_p = true_entry_p - (sl_k * vol_dist)
+                if sleeve == "smallcap":
+                    stop_p = true_entry_p * (1.0 - getattr(config, "SMALL_STOP_LOSS", 0.10))
+                else:
+                    stop_p = true_entry_p - (sl_k * vol_dist)
                 tp_p = true_entry_p + (tp_k * vol_dist)
 
                 ACTIVE_POSITIONS[pair] = {
@@ -291,7 +305,7 @@ def process_largecap_sleeve(raw_data: dict[str, pd.DataFrame]):
                 log.info("⏳ [LARGECAP PRICE GUARD] %s: Current price $%.4f is within %.1f%% of last exit $%.4f (Diff: %.2f%%). Skipping re-entry.", pair, latest_price, req_diff * 100.0, last_exit_p, price_diff_pct * 100.0)
                 continue
 
-        # Evaluate Strategy Entry Signal
+        # Evaluate Strategy Entry Signal: 28-Day Momentum + BTC 100d SMA Regime Filter
         min_bars_needed = int(getattr(config, "MIN_BARS_TO_TRADE", 60))
         if len(df) < min_bars_needed:
             continue
@@ -301,12 +315,17 @@ def process_largecap_sleeve(raw_data: dict[str, pd.DataFrame]):
         ret_24h = float(latest_price / df[price_col].iloc[-lb_24h] - 1.0) if lb_24h > 0 else 0.0
         is_booster_dip = (pair in booster_pairs and ret_24h <= getattr(config, "DEEP_DIP_TRIGGER_THRESHOLD_PCT", -0.050))
 
-        strat_fn = strategy.STRATEGIES.get(SELECTED_STRATEGY, strategy._reversal)
-        signals = strat_fn(pair, raw_data, None, df, {})
+        regime_on = is_btc_regime_on()
+        large_leaders = get_largecap_leaders()
+        is_large_leader = pair in large_leaders
 
-        raw_signal = signals.iloc[-1] if (signals is not None and not signals.empty) else 0.0
-        if raw_signal <= 0 and not is_booster_dip:
-            continue
+        # Large-Caps only enter if BTC > 100d SMA (unless it is a deep-dip booster like SUI)
+        if not is_booster_dip:
+            if not regime_on:
+                log.info("⏸️ [LARGECAP REGIME GATE] BTC is below 100d SMA (Risk-Off). Skipping Large-Cap entry for %s.", pair)
+                continue
+            if not is_large_leader:
+                continue
 
         realized_vol = df[price_col].pct_change().rolling(30, min_periods=5).std().iloc[-1]
         if realized_vol is None or np.isnan(realized_vol) or realized_vol <= 0:
@@ -317,26 +336,37 @@ def process_largecap_sleeve(raw_data: dict[str, pd.DataFrame]):
             vol_24h = realized_vol
 
         vol_distance = latest_price * vol_24h * np.sqrt(1440)
-        stop_loss_k = getattr(config, "STOP_LOSS_K", 2.0)
+        stop_loss_k = getattr(config, "STOP_LOSS_K", 3.0)
         take_profit_k = getattr(config, "TAKE_PROFIT_K", 1.5)
 
         stop_price = latest_price - (stop_loss_k * vol_distance)
         take_profit_price = latest_price + (take_profit_k * vol_distance)
 
-        # Check Programmatic Deep-Dip Booster Sizing
-        booster_pairs = getattr(config, "DEEP_DIP_BOOSTER_PAIRS", [])
-        lb_24h = min(1440, len(df) - 1)
-        ret_24h = float(latest_price / df[price_col].iloc[-lb_24h] - 1.0) if lb_24h > 0 else 0.0
-        if pair in booster_pairs and ret_24h <= getattr(config, "DEEP_DIP_TRIGGER_THRESHOLD_PCT", -0.050):
-            final_size = getattr(config, "DEEP_DIP_BOOSTER_POSITION_SIZE", 0.070)
+        # Check Total Large-Cap Sleeve Exposure ($35,000 Cap)
+        current_large_val = sum(
+            pinfo.get("quantity", 0.0) * pinfo.get("entry_price", 0.0)
+            for p, pinfo in ACTIVE_POSITIONS.items()
+            if pinfo.get("sleeve") == "largecap"
+        )
+        max_large_budget = account_equity * getattr(config, "LARGECAP_MAX_EXPOSURE", 0.35)
+        if current_large_val >= max_large_budget:
+            log.info("🛡️ [LARGECAP SLEEVE CAP] Large-Cap deployment ($%.2f) reached 35%% cap ($%.2f). Skipping new entry for %s.", current_large_val, max_large_budget, pair)
+            continue
+
+        # Sizing Calculation: 8.0% for SUI booster dip, or ~11.6% per 28-day leader (up to 15% max)
+        if is_booster_dip:
+            final_size = getattr(config, "DEEP_DIP_BOOSTER_POSITION_SIZE", 0.080)
             log.info("🔥 [LARGECAP DEEP-DIP BOOSTER TRIGGERED] %s: 24h Drop %.2f%% <= -5.0%%. Elevating position size to %.1f%% ($%.2f USD).", pair, ret_24h * 100.0, final_size * 100.0, account_equity * final_size)
         else:
-            final_size = sizing.calculate_position_size(raw_signal, realized_vol, max_position=getattr(config, "MAX_POSITION_PER_ASSET", 0.08))
+            n_leaders = max(1, len(large_leaders))
+            target_leader_size = getattr(config, "LARGECAP_MAX_EXPOSURE", 0.35) / n_leaders
+            final_size = min(getattr(config, "MAX_POSITION_PER_ASSET", 0.15), target_leader_size)
+            log.info("📈 [LARGECAP 28D MOMENTUM ENTRY] %s is a top 28-day leader (BTC Regime: 🟢 ON). Sizing: %.1f%% ($%.2f USD).", pair, final_size * 100.0, account_equity * final_size)
 
         if final_size <= 0:
             continue
 
-        target_usd_cost = account_equity * final_size
+        target_usd_cost = min(account_equity * final_size, max_large_budget - current_large_val)
 
         try:
             bal_resp = get_balance()
@@ -549,7 +579,7 @@ def process_midcap_sleeve(raw_data: dict[str, pd.DataFrame]):
                 lb_24h = min(1440, len(df) - 1)
                 ret_24h = float(latest_price / df[price_col].iloc[-lb_24h] - 1.0) if lb_24h > 0 else 0.0
                 if pair in booster_pairs and ret_24h <= getattr(config, "DEEP_DIP_TRIGGER_THRESHOLD_PCT", -0.050):
-                    target_usd = account_equity * getattr(config, "DEEP_DIP_BOOSTER_POSITION_SIZE", 0.070)
+                    target_usd = account_equity * getattr(config, "DEEP_DIP_BOOSTER_POSITION_SIZE", 0.080)
                     curr_val = quantity * latest_price
                     needed_usd = target_usd - curr_val
                     if needed_usd >= 500.0:
@@ -625,17 +655,28 @@ def process_midcap_sleeve(raw_data: dict[str, pd.DataFrame]):
         stop_price = latest_price - (stop_loss_k * vol_distance)
         take_profit_price = latest_price + (take_profit_k * vol_distance)
 
-        # Check Programmatic Deep-Dip Booster Sizing for Mid-Cap (e.g. ENA)
+        # Check Total Mid-Cap Sleeve Exposure ($30,000 Cap)
+        current_mid_val = sum(
+            pinfo.get("quantity", 0.0) * pinfo.get("entry_price", 0.0)
+            for p, pinfo in ACTIVE_POSITIONS.items()
+            if pinfo.get("sleeve") == "midcap"
+        )
+        max_mid_budget = account_equity * getattr(config, "MIDCAP_MAX_EXPOSURE", 0.30)
+        if current_mid_val >= max_mid_budget:
+            log.info("🛡️ [MIDCAP SLEEVE CAP] Mid-Cap deployment ($%.2f) reached 30%% cap ($%.2f). Skipping new entry for %s.", current_mid_val, max_mid_budget, pair)
+            continue
+
+        # Check Programmatic Deep-Dip Booster Sizing for Mid-Cap (e.g. ONDO)
         booster_pairs = getattr(config, "DEEP_DIP_BOOSTER_PAIRS", [])
         lb_24h = min(1440, len(df) - 1)
         ret_24h = float(latest_price / df[price_col].iloc[-lb_24h] - 1.0) if lb_24h > 0 else 0.0
         if pair in booster_pairs and ret_24h <= getattr(config, "DEEP_DIP_TRIGGER_THRESHOLD_PCT", -0.050):
-            midcap_size = getattr(config, "DEEP_DIP_BOOSTER_POSITION_SIZE", 0.070)
+            midcap_size = getattr(config, "DEEP_DIP_BOOSTER_POSITION_SIZE", 0.080)
             log.info("🔥 [MIDCAP DEEP-DIP BOOSTER TRIGGERED] %s: 24h Drop %.2f%% <= -5.0%%. Elevating position size to %.1f%% ($%.2f USD).", pair, ret_24h * 100.0, midcap_size * 100.0, account_equity * midcap_size)
         else:
-            midcap_size = getattr(config, "MIDCAP_MAX_POSITION_PER_ASSET", 0.05)
+            midcap_size = getattr(config, "MIDCAP_MAX_POSITION_PER_ASSET", 0.08)
 
-        target_usd_cost = account_equity * midcap_size
+        target_usd_cost = min(account_equity * midcap_size, max_mid_budget - current_mid_val)
 
         try:
             bal_resp = get_balance()
@@ -668,8 +709,186 @@ def process_midcap_sleeve(raw_data: dict[str, pd.DataFrame]):
             log.info("📝 [MIDCAP DRY RUN] Simulated BUY for %s: $%.2f USD (%.4f coins @ $%.2f)", pair, target_usd_cost, coin_quantity, latest_price)
 
 
+SMALLCAP_COOLDOWN_FILE = os.path.join(getattr(config, "STORE_DIR", "data_store"), "smallcap_cooldowns.json")
+
+
+def load_smallcap_cooldowns() -> dict:
+    if os.path.exists(SMALLCAP_COOLDOWN_FILE):
+        try:
+            with open(SMALLCAP_COOLDOWN_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def record_smallcap_cooldown(pair: str, hours: float = 72.0):
+    cooldowns = load_smallcap_cooldowns()
+    cooldowns[pair] = time.time() + (hours * 3600)
+    try:
+        os.makedirs(os.path.dirname(SMALLCAP_COOLDOWN_FILE), exist_ok=True)
+        with open(SMALLCAP_COOLDOWN_FILE, "w") as f:
+            json.dump(cooldowns, f, indent=2)
+        log.info("💾 [SMALLCAP LOCKOUT RECORDED] %s: 72-hour lockout active until %s", pair, time.ctime(cooldowns[pair]))
+    except Exception as e:
+        log.error("Failed to save smallcap cooldown file: %s", e)
+
+
+def is_smallcap_in_cooldown(pair: str) -> tuple[bool, int]:
+    cooldowns = load_smallcap_cooldowns()
+    expiry = cooldowns.get(pair, 0)
+    if time.time() < expiry:
+        rem_hours = int((expiry - time.time()) / 3600)
+        return True, rem_hours
+    return False, 0
+
+
+def process_smallcap_sleeve(raw_data: dict[str, pd.DataFrame]):
+    """Processes Sleeve 3 (10 Small-Cap Meme Coins) with 7d Confirmed Momentum, 10% Hard Stop, and 72h Lockout."""
+    smallcap_pairs = getattr(config, "SMALLCAP_UNIVERSE", [])
+    account_equity = getattr(config, "INITIAL_CAPITAL", 100000.0)
+
+    for pair in smallcap_pairs:
+        if pair not in raw_data or raw_data[pair].empty:
+            continue
+
+        df = raw_data[pair]
+        price_col = "close" if "close" in df.columns else "last_price"
+        latest_price = df[price_col].iloc[-1]
+
+        # Active Position Exits for Small-Caps
+        if pair in ACTIVE_POSITIONS:
+            pos = ACTIVE_POSITIONS[pair]
+            if pos.get("sleeve") == "smallcap":
+                entry_time = pos.get("entry_time", time.time())
+                entry_price = pos.get("entry_price", latest_price)
+                quantity = pos.get("quantity", 0.0)
+
+                highest_price = max(pos.get("highest_price", entry_price), latest_price)
+                pos["highest_price"] = highest_price
+                time_elapsed = time.time() - entry_time
+
+                # Rule 1: 10% Hard Stop Loss
+                hard_stop_price = entry_price * (1.0 - getattr(config, "SMALL_STOP_LOSS", 0.10))
+                if latest_price <= hard_stop_price:
+                    log.warning("🚨 [SMALLCAP RULE 1: 10%% HARD STOP-LOSS] %s: Price $%.6f dropped 10%% below entry $%.6f. Executing SELL & setting 72h lockout.", pair, latest_price, entry_price)
+                    if not DRY_RUN and quantity > 0:
+                        place_order(pair, "SELL", quantity=quantity)
+                    del ACTIVE_POSITIONS[pair]
+                    save_active_positions()
+                    record_last_exit_price(pair, latest_price)
+                    record_smallcap_cooldown(pair, hours=getattr(config, "SMALL_STOP_LOCKOUT_HOURS", 72.0))
+                    continue
+
+                # Volatility-Adjusted Dynamic Trailing Profit Ratchet Check for Small-Caps
+                vol_24h = df[price_col].pct_change().rolling(1440, min_periods=30).std().iloc[-1]
+                if vol_24h is None or np.isnan(vol_24h) or vol_24h <= 0:
+                    vol_24h = 0.002
+                vol_dist_pct = max(0.010, vol_24h * np.sqrt(1440))
+
+                highest_gain_pct = (highest_price - entry_price) / max(1e-8, entry_price)
+                trailing_floor_price = 0.0
+                active_tier_name = ""
+
+                dynamic_tiers = [
+                    (3.5 * vol_dist_pct, 2.8 * vol_dist_pct),
+                    (2.0 * vol_dist_pct, 1.5 * vol_dist_pct),
+                    (1.0 * vol_dist_pct, 0.7 * vol_dist_pct),
+                    (0.5 * vol_dist_pct, max(0.0040, 0.3 * vol_dist_pct)),
+                ]
+
+                for peak_req, floor_lock in dynamic_tiers:
+                    if highest_gain_pct >= peak_req:
+                        trailing_floor_price = entry_price * (1.0 + floor_lock)
+                        active_tier_name = f"+{peak_req*100:.2f}% Peak -> +{(floor_lock - 0.002)*100:.2f}% Net Floor"
+                        break
+
+                if trailing_floor_price > 0.0 and latest_price <= trailing_floor_price:
+                    locked_net_pct = ((latest_price - entry_price) / max(1e-8, entry_price) - 0.0020) * 100.0
+                    log.info("🎯 [SMALLCAP TRAILING RATCHET PROFIT] %s: Price $%.6f hit Trailing Floor $%.6f (%s, Entry: $%.6f). Executing SELL (Net PnL: +%.2f%%).", pair, latest_price, trailing_floor_price, active_tier_name, entry_price, locked_net_pct)
+                    if not DRY_RUN and quantity > 0:
+                        place_order(pair, "SELL", quantity=quantity)
+                    del ACTIVE_POSITIONS[pair]
+                    save_active_positions()
+                    record_last_exit_price(pair, latest_price)
+                    continue
+
+                log.info("[SMALLCAP] %s: Position active (Holding: %dm, Price: $%.6f, Hard Stop: $%.6f)", pair, int(time_elapsed // 60), latest_price, hard_stop_price)
+                continue
+
+        # Strategy Entry Signal: 7-Day Confirmed Momentum + BTC 100d SMA Gate
+        regime_on = is_btc_regime_on()
+        if not regime_on:
+            continue
+
+        in_lockout, rem_hrs = is_smallcap_in_cooldown(pair)
+        if in_lockout:
+            log.info("⏳ [SMALLCAP LOCKOUT] %s is in 72h post-stop lockout (%d hours remaining). Skipping re-entry.", pair, rem_hrs)
+            continue
+
+        small_leaders = get_smallcap_leaders()
+        if pair not in small_leaders:
+            continue
+
+        # Check Spread Guard (Skip if Roostoo bid/ask spread > 0.30%)
+        if "max_bid" in df.columns and "min_ask" in df.columns:
+            bid = float(df["max_bid"].iloc[-1])
+            ask = float(df["min_ask"].iloc[-1])
+            if bid > 0 and ask > 0:
+                spread = (ask - bid) / ask
+                max_spread = getattr(config, "SMALL_MAX_ENTRY_SPREAD", 0.003)
+                if spread > max_spread:
+                    log.info("⚠️ [SMALLCAP SPREAD GUARD] %s: Spread %.2f%% exceeds 0.30%% limit. Skipping entry.", pair, spread * 100.0)
+                    continue
+
+        # Check Total Small-Cap Sleeve Exposure ($5,000 Cap / 5%)
+        current_small_val = sum(
+            pinfo.get("quantity", 0.0) * pinfo.get("entry_price", 0.0)
+            for p, pinfo in ACTIVE_POSITIONS.items()
+            if pinfo.get("sleeve") == "smallcap"
+        )
+        max_small_budget = account_equity * getattr(config, "SMALLCAP_MAX_EXPOSURE", 0.05)
+        if current_small_val >= max_small_budget:
+            log.info("🛡️ [SMALLCAP SLEEVE CAP] Small-Cap deployment ($%.2f) reached 5%% cap ($%.2f). Skipping new entry for %s.", current_small_val, max_small_budget, pair)
+            continue
+
+        # Sizing Calculation: 2.0% ($2,000 max per meme coin)
+        small_size = getattr(config, "SMALLCAP_MAX_POSITION_PER_ASSET", 0.02)
+        target_usd_cost = min(account_equity * small_size, max_small_budget - current_small_val)
+
+        try:
+            bal_resp = get_balance()
+            if isinstance(bal_resp, dict) and bal_resp.get("Success"):
+                free_usd = float(bal_resp.get("SpotWallet", {}).get("USD", {}).get("Free", account_equity))
+                if target_usd_cost > free_usd:
+                    target_usd_cost = max(0.0, free_usd * 0.95)
+        except Exception:
+            pass
+
+        if target_usd_cost <= 0:
+            continue
+
+        coin_quantity = target_usd_cost / max(1e-8, latest_price)
+
+        ACTIVE_POSITIONS[pair] = {
+            "entry_time": time.time(),
+            "entry_price": latest_price,
+            "stop_price": latest_price * (1.0 - getattr(config, "SMALL_STOP_LOSS", 0.10)),
+            "take_profit_price": latest_price * 1.10,
+            "quantity": coin_quantity,
+            "sleeve": "smallcap",
+        }
+        save_active_positions()
+
+        if not DRY_RUN:
+            log.info("🚀 [SMALLCAP LIVE ORDER] Executing BUY for %s: $%.2f USD (%.2f coins @ $%.6f)", pair, target_usd_cost, coin_quantity, latest_price)
+            place_order(pair, "BUY", quantity=coin_quantity)
+        else:
+            log.info("📝 [SMALLCAP DRY RUN] Simulated BUY for %s: $%.2f USD (%.2f coins @ $%.6f)", pair, target_usd_cost, coin_quantity, latest_price)
+
+
 def run_once():
-    """Single execution step: fetch latest prices for all 23 coins and process Large-Cap & Mid-Cap sleeves."""
+    """Single execution step: fetch latest prices and process Large-Cap, Mid-Cap, and Small-Cap sleeves."""
     poll_once()
     raw = load_all(getattr(config, "UNIVERSE", LIVE_PAIRS))
 
@@ -680,11 +899,14 @@ def run_once():
     # Adopt any existing live wallet holdings into ACTIVE_POSITIONS without forced selling
     adopt_wallet_holdings(raw)
 
-    # Process Sleeve 1 (12 Large-Cap Coins)
+    # Process Sleeve 1 (12 Large-Cap Coins - 28d Momentum + BTC 100d SMA Gate)
     process_largecap_sleeve(raw)
 
-    # Process Sleeve 2 (11 Mid-Cap Coins)
+    # Process Sleeve 2 (11 Mid-Cap Coins - Hourly Momentum Leaders + ONDO Booster)
     process_midcap_sleeve(raw)
+
+    # Process Sleeve 3 (10 Small-Cap Meme Coins - 7d Confirmed Momentum + 10% Hard Stop)
+    process_smallcap_sleeve(raw)
 
 
 def run_forever(interval: int = config.POLL_INTERVAL_SECONDS):

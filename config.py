@@ -74,8 +74,14 @@ MIDCAP_UNIVERSE = [
     "ONDO/USD", "ENA/USD", "ARB/USD", "POL/USD", "SEI/USD", "CFX/USD"
 ]
 
-# Total Combined Active Trading Universe (23 Coins)
-UNIVERSE = LARGECAP_UNIVERSE + MIDCAP_UNIVERSE
+# Sleeve 3: 10 Small-Cap Meme Coins
+SMALLCAP_UNIVERSE = [
+    "PEPE/USD", "SHIB/USD", "BONK/USD", "WIF/USD", "FLOKI/USD",
+    "PENGU/USD", "TRUMP/USD", "1000CHEEMS/USD", "EIGEN/USD", "BIO/USD"
+]
+
+# Total Combined Active Trading Universe (33 Coins across 3 Sleeves)
+UNIVERSE = LARGECAP_UNIVERSE + MIDCAP_UNIVERSE + SMALLCAP_UNIVERSE
 MARKET_PROXY = "BTC/USD"  # used for "return relative to market" features
 
 # --- Data collection ---
@@ -114,21 +120,34 @@ SAFETY_MARGIN = 0.0003                        # extra edge required beyond costs
 TARGET_THRESHOLD = ROUND_TRIP_COST_ESTIMATE + SLIPPAGE_ESTIMATE + SAFETY_MARGIN
 
 # --- Portfolio Fund Allocation ($100,000 USD Total Equity) ---
-LARGECAP_MAX_EXPOSURE = 0.50     # 50% ($50,000 USD max deployment for Large-Caps)
-MIDCAP_MAX_EXPOSURE = 0.20       # 20% ($20,000 USD dedicated deployment for Mid-Caps)
+LARGECAP_MAX_EXPOSURE = 0.35     # 35% ($35,000 USD max deployment for Large-Caps)
+MIDCAP_MAX_EXPOSURE = 0.30       # 30% ($30,000 USD dedicated deployment for Mid-Caps)
+SMALLCAP_MAX_EXPOSURE = 0.05     # 5% ($5,000 USD dedicated deployment for Small-Caps)
 CASH_RESERVE_BUFFER = 0.30       # 30% ($30,000 USD preserved cash buffer reserve)
-MAX_PORTFOLIO_EXPOSURE = 0.70     # 70% total portfolio exposure cap
+MAX_PORTFOLIO_EXPOSURE = 0.70     # 70% total portfolio exposure cap (35% + 30% + 5%)
 MIN_CONFIDENCE_TO_TRADE = 0.55     # model probability threshold
 
-# Sleeve 1 (Large-Caps) Parameters
-MAX_POSITION_PER_ASSET = 0.08    # 8% max per large-cap coin
-STOP_LOSS_K = 3.0                # Exit if price drops by > 3.0 * Volatility distance (Rule 1, widened from 2.0)
+# Sleeve 1 (Large-Caps) Parameters (28-day Momentum + BTC 100d SMA Gate)
+MAX_POSITION_PER_ASSET = 0.15    # 15% max per large-cap coin
+LARGE_LOOKBACK_HOURS = 28 * 24   # 28 days for Large-Cap Momentum
+LARGE_TOP_K = 3                  # Top 3 Large-Caps
+REGIME_SMA_HOURS = 100 * 24      # 100-day BTC MA regime (only trade Large-Caps when BTC > 100d SMA)
+STOP_LOSS_K = 3.0                # Exit if price drops by > 3.0 * Volatility distance (Rule 1)
 TAKE_PROFIT_K = 1.5              # Exit if price gains > 1.5 * Volatility distance (Rule 2)
 
-# Sleeve 2 (Mid-Caps) Parameters
-MIDCAP_MAX_POSITION_PER_ASSET = 0.05 # 5% max per mid-cap coin ($5,000 USD)
-MIDCAP_STOP_LOSS_K = 3.5             # Exit if mid-cap price drops by > 3.5 * Volatility (Rule 1, widened from 3.0)
+# Sleeve 2 (Mid-Caps) Parameters (Hourly Momentum + Trailing Ratchets)
+MIDCAP_MAX_POSITION_PER_ASSET = 0.08 # 8% max per mid-cap coin ($8,000 USD)
+MIDCAP_STOP_LOSS_K = 3.5             # Exit if mid-cap price drops by > 3.5 * Volatility (Rule 1)
 MIDCAP_TAKE_PROFIT_K = 2.0           # Exit if mid-cap price gains > 2.0 * Volatility (Rule 2)
+
+# Sleeve 3 (Small-Caps) Parameters (7-day Confirmed Momentum + 10% Hard Stop)
+SMALLCAP_MAX_POSITION_PER_ASSET = 0.02 # 2% max per small-cap coin ($2,000 USD)
+SMALL_LOOKBACK_HOURS = 168             # 7 days
+SMALL_CONFIRM_HOURS = 24               # 24 hours
+SMALL_TOP_K = 2                        # Top 2 meme coins
+SMALL_STOP_LOSS = 0.10                 # 10% hard stop
+SMALL_STOP_LOCKOUT_HOURS = 72          # 72 hours post-stop lockout
+SMALL_MAX_ENTRY_SPREAD = 0.003         # Skip entry if spread > 0.30%
 
 # Slower Consolidating Mid-Caps (ONDO, CFX, POL, SEI, ARB) -> 12 Hours Recovery Window
 SLOW_CONSOLIDATING_MIDCAPS = [
@@ -136,17 +155,23 @@ SLOW_CONSOLIDATING_MIDCAPS = [
 ]
 SLOW_MIDCAP_EXPIRY_HOURS = 12        # 12 Hours recovery window for slower consolidating mid-caps
 FAST_MIDCAP_EXPIRY_HOURS = 4         # 4 Hours recovery window for fast-recovering mid-caps
-MIDCAP_RANK_UPDATE_INTERVAL_MINUTES = 60 # Hourly mid-cap momentum rank updates (filters 1m micro-noise while allowing 24/7 intraday trade recycling)
+MIDCAP_RANK_UPDATE_INTERVAL_MINUTES = 60 # Hourly mid-cap momentum rank updates
 POST_STOP_LOSS_COOLDOWN_HOURS = 2    # 2 Hours post-stop-loss cool-down lockout before re-entry
 
 # --- Price-Separation Re-Entry Guards ---
 LARGECAP_REENTRY_SEPARATION_PCT = 0.0100  # Requires 1.0% price distance from last exit price for Large-Caps
 MIDCAP_REENTRY_SEPARATION_PCT = 0.0200    # Requires 2.0% price distance from last exit price for Mid-Caps
 
-# --- Deep-Dip High-Alpha Booster Configuration ---
-DEEP_DIP_BOOSTER_PAIRS = ["AVAX/USD", "ENA/USD", "ADA/USD", "SUI/USD"]
-DEEP_DIP_BOOSTER_POSITION_SIZE = 0.070  # 7.0% of portfolio equity ($7,000 USD per coin)
-DEEP_DIP_TRIGGER_THRESHOLD_PCT = -0.050 # Triggers booster when 24h drop >= -5.0%
+# --- Deep-Dip High-Alpha Booster Configuration (ONDO and SUI) ---
+DEEP_DIP_BOOSTER_PAIRS = ["ONDO/USD", "SUI/USD"]
+DEEP_DIP_BOOSTER_POSITION_SIZE = 0.080  # 8.0% of portfolio equity ($8,000 USD per coin)
+DEEP_DIP_TRIGGER_THRESHOLD_PCT = -0.050 # Triggers booster when 24h drop <= -5.0%
+
+# Binance Klines URLs for macro regime and momentum signals
+BINANCE_KLINE_URLS = [
+    "https://api.binance.com/api/v3/klines",
+    "https://data-api.binance.vision/api/v3/klines",
+]
 # --- Separate Dynamic Trailing Profit Ratchets ---
 # Large-Cap Ratchet (Precision Tighter Locking for Lower-Volatility Majors)
 LARGECAP_TRAILING_RATCHETS = [
