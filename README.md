@@ -8,13 +8,13 @@ An autonomous, long-only trading bot for the Roostoo Quant Trading Hackathon. It
 
 One book, three sleeves with separate universes and risk budgets, rebalanced once a day after 00:00 UTC (details and evidence in [docs/SLEEVES.md](docs/SLEEVES.md)):
 
-| Sleeve | Signal | Budget (recovery mode) |
+| Sleeve | Signal | Budget |
 |---|---|---|
-| Large caps (BTC, ETH, SOL, BNB, XRP, ADA, DOGE, LINK, AVAX, DOT, LTC, SUI) | Top 3 by 28-day return, held only while BTC is above its 100-day average | 0.8% daily-vol target, up to 35% of equity |
-| Mid caps (22 coins) | 24h/168h momentum blend described below; half size while BTC is below its 100-day average | 0.8% daily-vol target, up to 30% |
-| Small caps (10 memecoins and small alts) | Top 2 by 7-day return, confirmed by a positive 24h return, only while BTC is above its 100-day average; hard stop 10% below entry | 0.25% daily-vol target, up to 5% |
+| Large caps (BTC, ETH, SOL, BNB, XRP, ADA, DOGE, LINK, AVAX, DOT, LTC, SUI) | Top 3 by 14-day return, held only while BTC is above its 100-day average | 1.0% daily-vol target, up to 32% of equity |
+| Mid caps (22 coins) | 24h/168h momentum blend described below; half size while BTC is below its 100-day average | 1.4% daily-vol target, up to 40% |
+| Small caps (10 memecoins and small alts) | Top 3 by 7-day return, confirmed by a positive 24h return, only while BTC is above its 100-day average; hard stop 10% below entry | 0.7% daily-vol target, up to 12% |
 
-Once equity is back above the $100k start, large- and mid-cap sizes step up (x1.5 and x1.25). The rest of this README describes the mid-cap sleeve's research and the shared engine, which the book runs on.
+Sizes were raised on Oct 12 to put idle cash to work (at most 90% invested), and the large-cap lookback was cut from 28 to 14 days on the strength of the team's 2022-26 research grid; see [docs/SLEEVES.md](docs/SLEEVES.md). The rest of this README describes the mid-cap sleeve's research and the shared engine, which the book runs on.
 
 **Mid-cap idea.** Over horizons of one to seven days, mid-cap crypto assets that have recently outperformed tended to keep outperforming in our 2026 test data (cross-sectional momentum), while short-horizon reversal lost in every configuration we tried. The sleeve buys the strongest recent performers, weights them by inverse volatility, keeps risk to a daily-volatility target, and sits in cash when nothing is trending.
 
@@ -43,7 +43,7 @@ Binance public klines (1h)          Roostoo API (/v3/ticker, /v3/balance, /v3/pl
 | Component | File |
 |---|---|
 | Three-sleeve book: sleeve signals and sizing | [strategies/sleeves.py](strategies/sleeves.py) |
-| Three-sleeve live/paper runner: small-cap stops, activity trade, recovery/push mode | [sleeves_live.py](sleeves_live.py) |
+| Three-sleeve live/paper runner: small-cap stops, activity trade, drawdown de-risk | [sleeves_live.py](sleeves_live.py) |
 | Strategy: momentum signals, volatility target, caps, overlays | [strategies/midcap.py](strategies/midcap.py) |
 | Live/paper runner: schedule, drawdown de-risk, state | [midcap_live.py](midcap_live.py) |
 | Engine shared with the earlier runner: reconcile, order loop, persistence | [main.py](main.py) |

@@ -65,7 +65,7 @@ Do this only after a paper run has covered a 00:00 UTC rebalance and the checkli
 
 ## 5a. Switching from the `main` dual-sleeve bot to the three-sleeve book (Oct 10)
 
-The instance runs the dual-sleeve bot from `main` (service `roostoo-bot`, repository `~/roostoo_bot`, started in `/home/ubuntu`). The three-sleeve book is on branch `Shreyan`; see [docs/SLEEVES.md](docs/SLEEVES.md). Install it next to the old one so the old bot's logs stay where they are.
+The instance runs the bot from `main` (the dual-sleeve engine with the teammate's Oct 11 three-sleeve port; service `roostoo-bot`, repository `~/roostoo_bot`, started in `/home/ubuntu`). The three-sleeve book is on branch `Shreyan`; see [docs/SLEEVES.md](docs/SLEEVES.md). Install it next to the old one so the old bot's logs stay where they are.
 
 ```bash
 git clone -b Shreyan https://github.com/ShockXR/Roostoo-Quant-Trading-Hackathon ~/sleeves_bot
@@ -75,17 +75,14 @@ cp ~/roostoo_bot/.env .env        # competition keys; never commit this file
 mkdir -p logs data_store
 ```
 
-1. **Checks, while the old bot still runs** (read-only, no orders): the five steps under "Before switching the live bot" in `docs/SLEEVES.md`: trade review, backtest, paper start, drawdown-schedule comparison, and the wallet and signal check with the competition keys.
-2. **Live switch commit**, only if step 1 passes the go-live rule at the end of `docs/SLEEVES.md`. It is its own commit so the history shows when live trading started:
+1. **Checks, while the old bot still runs** (read-only, no orders; run them on the `Shreyan` checkout). If time is short, steps 3 and 5 are the minimum (a few minutes): they prove the bot can read the account and compute targets from live data. The others compare strategy choices on real prices: the five steps under "Before switching the live bot" in `docs/SLEEVES.md`: trade review, backtest, paper start, drawdown-schedule comparison, and the wallet and signal check with the competition keys.
+2. **Switch the checkout to the live branch.** `Shreyan-live` is `Shreyan` plus one commit that sets `DRY_RUN = False` (`main.py`) and `LIVE_TRADING_ENABLED = True` (`config.py`). `Shreyan` itself stays in paper mode, so step 1 can never place an order.
 
 ```bash
-sed -i 's/^DRY_RUN = True/DRY_RUN = False/' main.py
-sed -i 's/^LIVE_TRADING_ENABLED = False/LIVE_TRADING_ENABLED = True/' config.py
-git diff                                   # exactly those two lines
-git commit -am "live: switch the three-sleeve book to live trading" && git push origin Shreyan
+git fetch origin && git checkout Shreyan-live && git pull
+git log --oneline -1                       # "live: switch the three-sleeve book to live trading"
+git diff origin/Shreyan --stat             # only main.py and config.py, one line each
 ```
-
-   If the instance has no GitHub push access, make the same commit on a laptop, push it, and `git pull` here.
 
    Start with no `data_store/sleeves_live_state.json` (a fresh clone has none), so the drawdown high-water mark starts at the account's equity on the first live cycle.
 3. **Stop the old bot before starting the new one.** Two bots on one account would trade against each other.
