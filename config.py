@@ -144,7 +144,7 @@ WALKFORWARD_STEP_BARS = 500
 RANDOM_SEED = 42
 
 # Paper is the default. Changing DRY_RUN alone cannot enable orders.
-LIVE_TRADING_ENABLED = False
+LIVE_TRADING_ENABLED = True
 ALLOW_SHORTS = False  # verify that this competition permits short positions
 MAX_QUOTE_AGE_MS = 120_000
 MAX_HISTORY_GAP_MS = 120_000

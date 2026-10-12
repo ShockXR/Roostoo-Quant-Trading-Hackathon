@@ -18,7 +18,7 @@ from .model.train import load_bundle
 from .strategy import model_target, rule_target
 
 log = logging.getLogger("main")
-DRY_RUN = True
+DRY_RUN = False
 
 
 def atomic_json(path, payload):
