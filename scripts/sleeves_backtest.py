@@ -69,14 +69,25 @@ def settings(**overrides):
     return SimpleNamespace(**values)
 
 
+OCT10_PARAMS = {
+    "large": {"target_daily_vol": 0.008, "max_gross": 0.35, "max_weight": 0.15, "regime_off_scale": 0.0},
+    "mid": {"target_daily_vol": 0.008, "max_gross": 0.30, "max_weight": 0.08, "regime_off_scale": 0.5},
+    "small": {"target_daily_vol": 0.0025, "max_gross": 0.05, "max_weight": 0.02, "regime_off_scale": 0.0},
+}
+
+
 def variants(panel):
     pairs = {s: [p for p in config.SLEEVE_PAIRS[s] if p in panel.signal.columns] for s in sleeves.SLEEVES}
     only = lambda keep: {s: (pairs[s] if s == keep else []) for s in sleeves.SLEEVES}
     no_gate = {**config.SLEEVE_PARAMS, "mid": {**config.SLEEVE_PARAMS["mid"], "regime_off_scale": 1.}}
     out = {
-        "sleeves (recovery sizing, live default)": sleeves.backtest_weights(panel, config, pairs),
-        "sleeves (push sizing)": sleeves.backtest_weights(panel, config, pairs, scale=config.PUSH_MULTIPLIER),
+        "sleeves (live default)": sleeves.backtest_weights(panel, config, pairs),
+        # The book as first shipped on Oct 10: 28-day large caps, smaller budgets, 2 small caps.
+        "sleeves at the Oct 10 settings": sleeves.backtest_weights(panel, settings(
+            SLEEVE_PARAMS=OCT10_PARAMS, LARGE_LOOKBACK_HOURS=28 * 24, SMALL_TOP_K=2), pairs),
         "large sleeve alone": sleeves.backtest_weights(panel, config, only("large")),
+        "large sleeve alone, 28-day lookback (Oct 10)": sleeves.backtest_weights(
+            panel, settings(LARGE_LOOKBACK_HOURS=28 * 24), only("large")),
         "mid sleeve alone": sleeves.backtest_weights(panel, config, only("mid")),
         "small sleeve alone": sleeves.backtest_weights(panel, config, only("small")),
         "mid sleeve, no BTC gate": sleeves.backtest_weights(panel, settings(SLEEVE_PARAMS=no_gate), only("mid")),

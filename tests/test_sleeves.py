@@ -221,12 +221,14 @@ class SleeveEngineTests(OfflineCase):
         events = engine.step(quotes, now)
         self.assertNotIn("PEPE/USD", {e["pair"] for e in events})
 
+    @patch.object(config, "PUSH_MULTIPLIER", {"large": 1.5, "mid": 1.25, "small": 1.0})  # off in config since Oct 12
     def test_push_mode_scales_large_and_mid_once_equity_is_above_start(self):
         engine = self.engine(PaperBroker(101_000.))
         now = DAY0 + DAY + 3 * 60_000
         engine.step(self.quotes(now), now)
         self.assertTrue(engine.rebalance.push)
-        self.assertAlmostEqual(self.value(engine, "BTC/USD") / 101_000, .1 * config.PUSH_MULTIPLIER["large"], delta=.004)
+        expected = min(.1 * config.PUSH_MULTIPLIER["large"], config.SLEEVE_PARAMS["large"]["max_weight"])  # caps still apply
+        self.assertAlmostEqual(self.value(engine, "BTC/USD") / 101_000, expected, delta=.004)
         self.assertAlmostEqual(self.value(engine, "UNI/USD") / 101_000, .05 * config.PUSH_MULTIPLIER["mid"], delta=.003)
         self.assertAlmostEqual(self.value(engine, "PEPE/USD") / 101_000, .02, delta=.001)
 
@@ -502,7 +504,8 @@ class SleevesBacktestScriptTests(OfflineCase):
                 patch("builtins.print"):
             script.main()
         text = out.read_text()
-        for name in ("sleeves (recovery sizing", "large sleeve alone", "previous blend_v10", "since Oct 04"):
+        for name in ("sleeves (live default)", "sleeves at the Oct 10 settings", "large sleeve alone, 28-day",
+                     "previous blend_v10", "since Oct 04"):
             self.assertIn(name, text)
 
 

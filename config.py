@@ -115,7 +115,7 @@ TARGET_THRESHOLD = ROUND_TRIP_COST_ESTIMATE + SLIPPAGE_ESTIMATE + SAFETY_MARGIN
 # high-drawdown bot scores worse than a modest-return, low-drawdown one.
 # Risk controls below are tuned toward that, not toward maximizing raw PnL.
 MAX_POSITION_PER_ASSET = 0.20    # fraction of capital, trimmed from 0.25 for risk-adjusted scoring
-MAX_PORTFOLIO_EXPOSURE = 0.7      # fraction of capital deployed at once
+MAX_PORTFOLIO_EXPOSURE = 0.90     # fraction of capital deployed at once (0.7 until Oct 12: too much idle cash for the last week)
 MAX_TRADES_PER_HOUR = 20
 MAX_DRAWDOWN_KILL_SWITCH = 0.12   # Calmar = return / max drawdown, so capping drawdown directly protects this metric
 MIN_CONFIDENCE_TO_TRADE = 0.55     # model probability threshold to act at all
@@ -174,9 +174,11 @@ MIDCAP_MAX_TRADES_PER_HOUR = 40    # replay peak was 19 in one hour; at most 40 
 MAX_CLOCK_SKEW_MS = 10_000         # tolerated lead of the server clock over this machine's when judging quote age
 MIDCAP_MAX_REJECTIONS_PER_PAIR = 2   # stop retrying a pair the exchange refuses this often per rebalance
 MIDCAP_MAX_REBALANCE_CYCLES = 30   # give up on a rebalance that cannot finish (e.g. repeated rejections); every other cycle is starved by the API budget
-# Staged drawdown de-risk from the equity high-water mark: half size beyond 3%, 30% beyond 6%.
-# Never zero, so the bot keeps trading; size returns at the next daily rebalance once drawdown recovers.
-MIDCAP_DRAWDOWN_SCHEDULE = ((0.03, 0.5), (0.06, 0.3))
+# Drawdown de-risk from the equity high-water mark: 30% size beyond a 6% drawdown. Never zero, so the bot
+# keeps trading; size returns at the next daily rebalance once drawdown recovers. Until Oct 12 there was also
+# a half-size stage at 3%; it fired on ordinary noise and cost about a third of the mid-cap replay's return
+# (docs/LIVE_READINESS.md), and the red team's runs favoured the single 6% stage (docs/REDTEAM_2026-10-10.md M1).
+MIDCAP_DRAWDOWN_SCHEDULE = ((0.06, 0.3),)
 MIDCAP_HISTORY_HOURS = 400         # hourly closes fetched for signals (needs at least 169)
 MIDCAP_STATE_PATH = "data_store/midcap_state.json"
 MIDCAP_LIVE_STATE_PATH = "data_store/midcap_live_state.json"  # live and paper state never share a file
@@ -194,24 +196,28 @@ SLEEVE_PAIRS = {
     "small": ["PEPE/USD", "SHIB/USD", "BONK/USD", "WIF/USD", "FLOKI/USD", "PENGU/USD", "TRUMP/USD",
               "1000CHEEMS/USD", "EIGEN/USD", "BIO/USD"],
 }
-# Budgets in recovery mode (equity below PUSH_MODE_EQUITY). Sum of gross caps = 70%.
+# Sleeve budgets (Oct 12: raised from 0.8%/0.8%/0.25% vol and 35%/30%/5% caps, which left about 40% of
+# equity in cash). Sum of gross caps = 84%, under MAX_PORTFOLIO_EXPOSURE.
 SLEEVE_PARAMS = {
-    "large": {"target_daily_vol": 0.008, "max_gross": 0.35, "max_weight": 0.15, "regime_off_scale": 0.0},
-    "mid": {"target_daily_vol": 0.008, "max_gross": 0.30, "max_weight": 0.08, "regime_off_scale": 0.5},
-    "small": {"target_daily_vol": 0.0025, "max_gross": 0.05, "max_weight": 0.02, "regime_off_scale": 0.0},
+    "large": {"target_daily_vol": 0.010, "max_gross": 0.32, "max_weight": 0.12, "regime_off_scale": 0.0},
+    "mid": {"target_daily_vol": 0.014, "max_gross": 0.40, "max_weight": 0.10, "regime_off_scale": 0.5},
+    "small": {"target_daily_vol": 0.007, "max_gross": 0.12, "max_weight": 0.04, "regime_off_scale": 0.0},
 }
-LARGE_LOOKBACK_HOURS = 28 * 24   # Model 3: 28-day momentum
+# 14-day momentum (28 until Oct 12). In the committed Model 3 grid (origin/live-readiness
+# experiments/long/G07_m3_neighbourhood), 28 days was the worst lookback in the 2025-26 out-of-sample test at
+# every BTC SMA setting, while 14 days had the best full-period and validation Sharpe at every setting.
+LARGE_LOOKBACK_HOURS = 14 * 24
 LARGE_TOP_K = 3
 REGIME_SMA_HOURS = 100 * 24      # BTC above its 100-day average = risk on
 SMALL_LOOKBACK_HOURS = 168
 SMALL_CONFIRM_HOURS = 24
-SMALL_TOP_K = 2
+SMALL_TOP_K = 3
 SLEEVE_HISTORY_HOURS = {"large": REGIME_SMA_HOURS + 100, "mid": 400, "small": 400}
 # Push mode: once equity is back above the starting capital at a daily rebalance,
 # large and mid exposure is multiplied (caps still apply). Decided once a day, so it
 # does not flap around the threshold.
 PUSH_MODE_EQUITY = 100_000.0
-PUSH_MULTIPLIER = {"large": 1.5, "mid": 1.25, "small": 1.0}
+PUSH_MULTIPLIER = {"large": 1.0, "mid": 1.0, "small": 1.0}  # off since Oct 12: the base budgets above are the push
 # Small-cap guards: hard stop from the average entry price (checked every minute),
 # a lockout after a stop, and no new small-cap entry through a wide Roostoo spread.
 SMALL_STOP_LOSS = 0.10

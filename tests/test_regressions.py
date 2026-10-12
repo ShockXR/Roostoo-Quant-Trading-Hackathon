@@ -299,8 +299,8 @@ class DataAndAccountingTests(OfflineCase):
 class ExecutionTests(OfflineCase):
     def test_signed_gross_and_per_asset_limits(self):
         result = sizing.enforce_portfolio_limits({"A": .6, "B": -.6, "C": .6, "D": -.6})
-        self.assertLessEqual(sum(abs(v) for v in result.values()), .7)
-        self.assertTrue(all(abs(v) <= .2 for v in result.values()))
+        self.assertLessEqual(sum(abs(v) for v in result.values()), config.MAX_PORTFOLIO_EXPOSURE + 1e-12)
+        self.assertTrue(all(abs(v) <= config.MAX_POSITION_PER_ASSET for v in result.values()))
 
     def test_sizing_rejects_nonfinite_and_responds_to_volatility(self):
         self.assertEqual(sizing.confidence_to_size(.9, np.nan), 0.)
@@ -320,8 +320,8 @@ class ExecutionTests(OfflineCase):
         snapshot = runner.broker.state
         equity = snapshot.equity(quotes)
         gross = sum(v * quotes[p].price for p, v in snapshot.longs.items()) / equity
-        self.assertLessEqual(gross, .7)
-        self.assertTrue(all(v * quotes[p].price / equity <= .2 for p, v in snapshot.longs.items()))
+        self.assertLessEqual(gross, config.MAX_PORTFOLIO_EXPOSURE)
+        self.assertTrue(all(v * quotes[p].price / equity <= config.MAX_POSITION_PER_ASSET for p, v in snapshot.longs.items()))
 
     def test_identical_snapshot_does_not_repeat_buy(self):
         runner = self.runner()
