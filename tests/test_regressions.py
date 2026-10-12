@@ -424,7 +424,7 @@ class ExecutionTests(OfflineCase):
             self.assertFalse(runner.broker.state.shorts)
 
     def test_dry_run_cannot_enable_live_broker(self):
-        with self.assertRaises(RuntimeError):
+        with patch.object(config, "LIVE_TRADING_ENABLED", False), self.assertRaises(RuntimeError):
             LiveBroker()
 
     def test_minimum_order_filter(self):
