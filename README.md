@@ -80,4 +80,4 @@ Branch `Shreyan` is paper mode. Branch `Shreyan-live` is `Shreyan` plus one comm
 
 ## Team
 
-Shreyan Thanki ([ShockXR](https://github.com/ShockXR)), Samyak ([SamyakJain092006](https://github.com/SamyakJain092006)), Satyam and Harshit. Built with assistance from Claude (Anthropic).
+Shreyan Thanki ([ShockXR](https://github.com/ShockXR)), Samyak ([SamyakJain092006](https://github.com/SamyakJain092006)), Satyam and Harshit.
